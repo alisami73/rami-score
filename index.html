@@ -603,20 +603,33 @@ async function loadSavedParties(){
   try{
     const{data,error}=await db
       .from('parties')
-      .select('winner,created_at,history')
+      .select('winner,created_at,history,players')
       .eq('finished',true)
       .order('created_at',{ascending:false})
       .limit(10);
     if(error||!data?.length){el.innerHTML=`<div style="text-align:center;font-style:italic;color:var(--text-muted);padding:12px 0;">Aucune partie sauvegardée.</div>`;return}
-    el.innerHTML=data.map(p=>{
+    el.innerHTML=data.map((p,gi)=>{
       const date=new Date(p.created_at).toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric'});
       const tours=(p.history||[]).filter(r=>!r.parole).length;
+      const players=(p.players||[]);
+      const sorted=players.map((pl,i)=>({...pl,idx:i})).sort((a,b)=>{
+        if(a.eliminated!==b.eliminated)return a.eliminated?1:-1;
+        return a.score-b.score;
+      });
+      const playersHtml=sorted.map((pl,rank)=>`
+        <div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:14px;">
+          <span style="font-family:var(--display);color:var(--gold-soft);width:18px;text-align:center;">${rank+1}</span>
+          ${avatar(pl.name,pl.idx,'sm')}
+          <span style="flex:1;color:${pl.eliminated?'var(--text-muted)':'var(--text)'};">${esc(pl.name)}${pl.eliminated?' ☕':''}</span>
+          <span style="color:${pl.eliminated?'var(--red)':'var(--text-dim)'};">${pl.score} pts</span>
+        </div>`).join('');
+      const id='sp'+gi;
       return`<div class="round-card" style="margin-bottom:10px;">
-        <div class="round-head">
-          <div class="round-num">${date}</div>
-          <div class="round-dealer">${esc(p.winner)}</div>
+        <div class="round-head" onclick="document.getElementById('${id}').style.display=document.getElementById('${id}').style.display==='none'?'block':'none'" style="cursor:pointer;">
+          <div class="round-num">${date} · ${tours} tour${tours!==1?'s':''}</div>
+          <div class="round-dealer">★ ${esc(p.winner)} ▾</div>
         </div>
-        <div style="font-size:14px;color:var(--text-muted);font-style:italic;">${tours} tour${tours!==1?'s':''} joués</div>
+        <div id="${id}" style="display:none;">${playersHtml}</div>
       </div>`;
     }).join('');
   }catch(e){el.innerHTML=''}
@@ -825,10 +838,11 @@ function viewEnter(){
 
 function viewHistory(){
   const savedSection=`<div class="panel" style="margin-top:16px;">
-    <div class="panel-title">Parties sauvegardées</div>
+    <div class="panel-title">Parties précédentes</div>
     <div id="saved-parties"><div style="text-align:center;font-style:italic;color:var(--text-muted);padding:12px 0;">Chargement…</div></div>
   </div>`;
   if(!state.rounds.length)return`<div class="empty-history"><div class="ornament">❦</div><div style="font-family:var(--display);font-size:20px;color:var(--text-dim);margin-bottom:6px;">Aucun tour pour le moment</div><div>Saisis le premier tour dans l'onglet Saisir.</div></div>${savedSection}`;
+  const undoBtn=`<button class="btn btn-ghost btn-block" data-act="undoRound" style="margin-bottom:14px;font-size:13px;">↩ Annuler le dernier tour</button>`;
   const localRounds=state.rounds.slice().reverse().map((r,ri)=>{
     const num=state.rounds.length-ri;
     const dealerName=state.players[r.dealerIdx]?.name||'—';
@@ -847,12 +861,12 @@ function viewHistory(){
             <span>${esc(p.name)}${e.isWinner?' ★':''}</span>
             ${tags.length?`<span class="tags">${tags.join(' · ')}</span>`:''}
           </div>
-          <span class="pt" style="color:${e.delta===0?'var(--gold-soft)':e.delta>=51?'var(--red)':'var(--text-dim)'}">+${e.delta}</span>
+          <span class="pt" style="color:${e.isWinner?'var(--gold-soft)':e.delta>=51?'var(--red)':'var(--text-dim)'}">+${e.delta}</span>
         </div>`;
       }).join('')}
     </div>`;
   }).join('');
-  return localRounds+savedSection;
+  return undoBtn+localRounds+savedSection;
 }
 
 function viewFinished(){
@@ -877,7 +891,7 @@ function viewFinished(){
         <div class="ranking-row ${i===0?'gold':''}">
           <div class="pos">${i+1}</div>
           ${avatar(p.name,p.idx,'md')}
-          <div class="nm">${esc(p.name)} ${p.eliminated?`<span class="badge badge-out" style="font-size:9px;">Éliminé</span>`:''}</div>
+          <div class="nm">${esc(p.name)} ${p.eliminated?`<span class="badge badge-out" style="font-size:9px;">Éliminé</span> <span style="font-size:18px;" title="Offre la consommation">☕</span>`:''}</div>
           <div class="pt">${p.score} pts</div>
         </div>`).join('')}
     </div>
@@ -1022,6 +1036,22 @@ function viewTableau(){
     <button class="btn btn-ghost btn-block" data-act="redistribute" style="margin-top:10px;">↻ Nouvelle distribution</button>`;
 }
 
+function undoLastRound(){
+  if(!state.rounds.length){showToast('Aucun tour à annuler');return}
+  const last=state.rounds[state.rounds.length-1];
+  if(!last.parole){
+    last.entries.forEach(e=>{
+      state.players[e.idx].score-=e.delta;
+      state.players[e.idx].eliminated=state.players[e.idx].score>=ELIMINATION;
+    });
+  }
+  state.rounds.pop();
+  state.draft=emptyDraft();
+  if(state.screen==='finished')state.screen='game';
+  render();
+  showToast('Tour annulé ↩');
+}
+
 function autoSetWinner(){
   if(state.screen!=='game')return;
   const d=state.draft;
@@ -1127,6 +1157,7 @@ document.addEventListener('click',ev=>{
       if(!e.parole){e.p51badLay=!e.p51badLay;render()}
       break;
     }
+    case 'undoRound':if(confirm('Annuler le dernier tour et corriger les scores ?'))undoLastRound();break;
     case 'redistribute':handleRedistribute();break;
     case 'validateRound':handleValidateRound();break;
     case 'clearDraft':state.draft=emptyDraft();render();showToast('Saisie effacée');break;

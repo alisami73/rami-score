@@ -737,9 +737,7 @@ function viewScores(){
         </div>
       </div>`;
     }).join('')}
-    <div style="margin-top:8px;">
-      <button class="btn btn-ghost btn-block" data-act="resetConfirm">Nouvelle partie</button>
-    </div>`;
+  `;
 }
 
 function viewEnter(){
@@ -1070,12 +1068,33 @@ function autoSetWinner(){
   }
 }
 
+function viewPickDealer(){
+  return`<div class="content no-tabs fade-in">
+    <div class="setup-hero">
+      <div class="ornament">✦ ❦ ✦</div>
+      <h1>Qui distribue ?</h1>
+      <p>Touche le joueur qui commence à distribuer les cartes</p>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      ${state.players.map((p,i)=>`
+        <button class="score-card" data-act="chooseDealer" data-i="${i}" style="cursor:pointer;transition:border-color .15s,box-shadow .15s;">
+          <div style="display:flex;align-items:center;gap:16px;padding:4px 0;">
+            ${avatar(p.name,i,'lg')}
+            <div style="font-family:var(--display);font-size:24px;">${esc(p.name)}</div>
+          </div>
+        </button>`).join('')}
+    </div>
+  </div>`;
+}
+
 function render(){
   if(state.screen==='game')autoSetWinner();
   const root=document.getElementById('app');
   let body='';
   if(state.screen==='setup'){
     body=`<header class="header"><div class="brand">Rami</div><div class="brand-sub">Compteur de scores</div></header>${viewSetup()}`;
+  }else if(state.screen==='pickDealer'){
+    body=`<header class="header"><div class="brand">Rami</div><div class="brand-sub">Choix du distributeur</div></header>${viewPickDealer()}`;
   }else if(state.screen==='finished'){
     body=`<header class="header"><div class="brand">Fin de partie</div><div class="brand-sub">${state.rounds.length} tour${state.rounds.length!==1?'s':''} joués</div></header>${viewFinished()}`;
   }else{
@@ -1111,10 +1130,15 @@ document.addEventListener('click',ev=>{
       const names=state.players.slice(0,state.nbPlayers).map(p=>p.name.trim());
       if(names.some(n=>!n)){showToast('Saisis tous les noms');return}
       state.players=names.map(n=>({name:n,score:0,eliminated:false}));
-      state.rounds=[];state.draft=emptyDraft();state.screen='game';state.tab='enter';
-      pickRandomDealer();
+      state.rounds=[];state.draft=emptyDraft();state.screen='pickDealer';state.tab='enter';
+      render();break;
+    }
+    case 'chooseDealer':{
+      const i=+t.dataset.i;
+      state.dealerIdx=i;
+      state.screen='game';state.tab='enter';
       render();
-      showToast(`${state.players[state.dealerIdx].name} distribue en premier`);
+      showToast(`${state.players[i].name} distribue en premier`);
       break;
     }
     case 'setTab':closeSheet();state.tab=t.dataset.tab;render();break;

@@ -1038,18 +1038,6 @@ document.addEventListener('click',ev=>{
       while(state.players.length<n)state.players.push({name:'',score:0,eliminated:false});
       render();break;
     }
-    case 'nameSelect':{
-      const i=+t.dataset.i;
-      const val=t.value;
-      if(val==='__autre__'){
-        playerOtherMode.add(i);
-        state.players[i].name='';
-      }else{
-        playerOtherMode.delete(i);
-        state.players[i].name=val;
-      }
-      render();break;
-    }
     case 'addCustomName':{
       const i=+t.dataset.i;
       const name=state.players[i].name.trim();
@@ -1115,6 +1103,23 @@ document.addEventListener('click',ev=>{
     case 'clearDraft':state.draft=emptyDraft();render();showToast('Saisie effacée');break;
     case 'resetConfirm':if(confirm('Terminer la partie et en commencer une nouvelle ?'))resetGame();break;
     case 'newGame':resetGame();break;
+  }
+});
+
+document.addEventListener('change',ev=>{
+  const t=ev.target.closest('[data-act]');
+  if(!t)return;
+  if(t.dataset.act==='nameSelect'){
+    const i=+t.dataset.i;
+    const val=t.value;
+    if(val==='__autre__'){
+      playerOtherMode.add(i);
+      state.players[i].name='';
+    }else{
+      playerOtherMode.delete(i);
+      state.players[i].name=val;
+    }
+    render();
   }
 });
 

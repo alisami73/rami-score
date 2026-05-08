@@ -622,7 +622,12 @@ function nextActiveAfter(idx){
   for(let k=1;k<=n;k++){const j=(idx+k)%n;if(!state.players[j].eliminated)return j}
   return idx;
 }
-function ensureDealerActive(){if(state.players[state.dealerIdx]?.eliminated)state.dealerIdx=nextActiveAfter(state.dealerIdx)}
+function nextActiveBefore(idx){
+  const n=state.players.length;
+  for(let k=1;k<=n;k++){const j=(idx-k+n)%n;if(!state.players[j].eliminated)return j}
+  return idx;
+}
+function ensureDealerActive(){if(state.players[state.dealerIdx]?.eliminated)state.dealerIdx=nextActiveBefore(state.dealerIdx)}
 function pickRandomDealer(){const a=activeIndices();state.dealerIdx=a[Math.floor(Math.random()*a.length)]}
 
 function scoreTone(s){if(s>=100)return'danger';if(s>=70)return'warn';return'safe'}
@@ -777,6 +782,7 @@ function applySheet(){
   const idx=sheetPlayerIdx;
   if(sheetData.isWinner)activeIndices().forEach(j=>{if(state.draft.perPlayer[j])state.draft.perPlayer[j].isWinner=false});
   state.draft.perPlayer[idx]={isWinner:sheetData.isWinner,malus:sheetData.malus,cardCounts:hasCardCounts(sheetData.cardCounts)?normalizeCardCounts(sheetData.cardCounts):null,p51noFollow:sheetData.p51noFollow,p51badLay:sheetData.p51badLay,etale:sheetData.etale,parole:false};
+  state.draft.started=true;
   closeSheet();render();
 }
 function firstCalcRank(cardCounts){return RANKS.find(r=>(cardCounts?.[r.id]||0)>0)?.id||RANKS[0].id}
@@ -813,6 +819,7 @@ function applyCardCalculator(){
   const e=state.draft.perPlayer[calcContext.idx]=state.draft.perPlayer[calcContext.idx]||{};
   e.cardCounts=result.cardCounts;
   e.malus=result.malus;
+  state.draft.started=true;
   closeCardCalculator();
   render();
 }
@@ -1112,6 +1119,8 @@ function viewEnter(){
   const isEtIncompletDraft=etBadLayIdx!=null&&winnerIdx==null;
   const anyMalusEntered=active.some(i=>{const e=d.perPlayer[i]||{};return!e.isWinner&&!e.p51noFollow&&!e.p51badLay&&!e.parole&&e.malus!==null&&e.malus!==undefined&&!isNaN(e.malus);});
   const hasJoker=d.jokerRank&&d.jokerSuit;
+  const redistributionDealerIdx=d.started?nextActiveBefore(dealer):dealer;
+  const redistributionDealerName=state.players[redistributionDealerIdx]?.name||'—';
 
   return`
     <div class="panel panel-gold">
@@ -1191,9 +1200,9 @@ function viewEnter(){
       ?`<div class="panel" style="text-align:center;border-color:var(--blue-gray);">
           <div style="font-family:var(--display);font-size:18px;color:var(--blue-gray-2);letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px;">Tous parole</div>
           <div style="font-style:italic;color:var(--text-muted);font-size:14px;">
-            ${d.started?'Tour commencé — le distributeur passe à gauche.':'Tour non commencé — même distributeur.'}
+            ${d.started?`Tour commencé — la donne passe à droite à ${esc(redistributionDealerName)}.`:`Tour non commencé — ${esc(redistributionDealerName)} redistribue.`}
           </div>
-          <button class="btn btn-primary btn-block mt-16" data-act="redistribute">↻ Redistribuer</button>
+          <button class="btn btn-primary btn-block mt-16" data-act="redistribute">↻ Nouvelle distribution de ${esc(redistributionDealerName)}</button>
         </div>`
       :`<div class="row-flex">
           <button class="btn btn-ghost" data-act="clearDraft">Effacer</button>
@@ -1214,7 +1223,7 @@ function viewHistory(){
   const localRounds=state.rounds.slice().reverse().map((r,ri)=>{
     const num=state.rounds.length-ri;
     const dealerName=state.players[r.dealerIdx]?.name||'—';
-    if(r.parole)return`<div class="round-card"><div class="round-head"><div class="round-num">Tour ${num} · Parole</div><div class="round-dealer">${esc(dealerName)}</div></div><div class="round-parole">↻ Redistribution ${r.dealerAdvanced?'· distributeur avancé':'· même distributeur'}</div></div>`;
+    if(r.parole)return`<div class="round-card"><div class="round-head"><div class="round-num">Tour ${num} · Parole</div><div class="round-dealer">${esc(dealerName)}</div></div><div class="round-parole">↻ Redistribution ${r.dealerAdvanced?'· donne passée à droite':'· même distributeur'}</div></div>`;
     return`<div class="round-card">
       <div class="round-head"><div class="round-num">Tour ${num}</div><div class="round-dealer">${esc(dealerName)} donne</div></div>
       ${r.jokerRank&&r.jokerSuit?`<div class="round-joker"><span class="mini-tag">Jokers :</span>${cardHTML(r.jokerRank,r.jokerSuit,true)}<span class="joker-arrow" style="font-size:16px;">➜</span>${jokerCardsHTML(r.jokerRank,r.jokerSuit,true)}</div>`:''}
@@ -1616,25 +1625,25 @@ document.addEventListener('click',ev=>{
         state.draft.perPlayer[i].malus=0;
         state.draft.perPlayer[i].cardCounts=null;
       }
-      render();break;
+      state.draft.started=true;render();break;
     }
     case 'toggleParole':{
       const i=+t.dataset.i;
       const e=state.draft.perPlayer[i]=state.draft.perPlayer[i]||{};
       e.parole=!e.parole;
       if(e.parole){e.isWinner=false;e.malus=0;e.cardCounts=null;e.p51noFollow=false;e.p51badLay=false}
-      render();break;
+      state.draft.started=true;render();break;
     }
     case 'toggleP51nf':{
       const i=+t.dataset.i;
       const e=state.draft.perPlayer[i]=state.draft.perPlayer[i]||{};
-      if(!e.parole&&!e.p51badLay){e.p51noFollow=!e.p51noFollow;render()}
+      if(!e.parole&&!e.p51badLay){e.p51noFollow=!e.p51noFollow;state.draft.started=true;render()}
       break;
     }
     case 'toggleP51be':{
       const i=+t.dataset.i;
       const e=state.draft.perPlayer[i]=state.draft.perPlayer[i]||{};
-      if(!e.parole&&!e.p51noFollow){e.p51badLay=!e.p51badLay;render()}
+      if(!e.parole&&!e.p51noFollow){e.p51badLay=!e.p51badLay;state.draft.started=true;render()}
       break;
     }
     case 'undoRound':if(confirm('Annuler le dernier tour et corriger les scores ?'))undoLastRound();break;
@@ -1684,6 +1693,7 @@ document.addEventListener('input',ev=>{
     state.draft.perPlayer[i]=state.draft.perPlayer[i]||{};
     state.draft.perPlayer[i].malus=isNaN(v)?null:Math.max(0,v);
     state.draft.perPlayer[i].cardCounts=null;
+    state.draft.started=true;
     t.closest('.player-entry')?.querySelector('.calc-note')?.remove();
     saveState();
   }
@@ -1692,10 +1702,11 @@ document.addEventListener('input',ev=>{
 function handleRedistribute(){
   const wasStarted=state.draft.started;
   state.rounds.push({parole:true,dealerIdx:state.dealerIdx,started:wasStarted,dealerAdvanced:wasStarted,jokerRank:state.draft.jokerRank,jokerSuit:state.draft.jokerSuit,entries:[]});
-  if(wasStarted)state.dealerIdx=nextActiveAfter(state.dealerIdx);
+  if(wasStarted)state.dealerIdx=nextActiveBefore(state.dealerIdx);
+  const nextDealerName=state.players[state.dealerIdx]?.name||'—';
   state.draft=emptyDraft();render();
   playRandomSnippet();
-  showToast(wasStarted?'Redistribution · distributeur avancé':'Redistribution · même distributeur');
+  showToast(wasStarted?`Nouvelle distribution · ${nextDealerName} donne`:`Nouvelle distribution · ${nextDealerName} redonne`);
 }
 
 function handleValidateRound(){
@@ -1738,7 +1749,7 @@ function handleValidateRound(){
   else if(noFollowTriggered)playNoFollowSound();
   else if(newlyOut.length)playEliminationSound();
   state.rounds.push({parole:false,dealerIdx:state.dealerIdx,jokerRank:d.jokerRank,jokerSuit:d.jokerSuit,started:d.started,entries});
-  state.dealerIdx=nextActiveAfter(state.dealerIdx);
+  state.dealerIdx=nextActiveBefore(state.dealerIdx);
   // Game ends when 2+ players are eliminated (remaining players are winners)
   if(state.players.filter(p=>p.eliminated).length>=2){
     if(state.playForCoffee){

@@ -540,12 +540,11 @@ function persistCustomName(name){
 
 let state=loadState()||freshSetup();
 let toastTimer=null;
-let eliminationAudio=null;
-let noFollowAudio=null;
-let badLayAudio=null;
-let snippetAudios=[];
-let lastSnippetIndex=-1;
-let audioPrimed=false;
+let audioCtx=null;
+const audioBuffers={};
+const htmlAudios={};
+let audioUnlocked=false;
+let lastSnippetKey=null;
 
 function freshSetup(){
   return{
@@ -676,96 +675,89 @@ function resolveAppUrl(path){
   const baseHref=hasHtmlFile||href.endsWith('/')?href:`${href}/`;
   return new URL(path,baseHref).href;
 }
-const ELIMINATION_SOUND_SRC=resolveAppUrl('assets/audio/joueur-sorti.m4a');
-const NO_FOLLOW_SOUND_SRC=resolveAppUrl('assets/audio/sans-suivi-51.m4a');
-const BAD_LAY_SOUND_SRC=resolveAppUrl('assets/audio/etalage-incomplet.m4a');
-const EXTRA_SNIPPET_SRCS=[
-  resolveAppUrl('assets/audio/snippet-8.m4a'),
-  resolveAppUrl('assets/audio/snippet-9.m4a'),
-];
-function buildAudio(src){
-  const audio=new Audio(src);
-  audio.preload='auto';
-  audio.playsInline=true;
-  audio.load();
-  return audio;
+const AUDIO_SRCS={
+  elimination:resolveAppUrl('assets/audio/joueur-sorti.m4a'),
+  noFollow:resolveAppUrl('assets/audio/sans-suivi-51.m4a'),
+  badLay:resolveAppUrl('assets/audio/etalage-incomplet.m4a'),
+  snippet8:resolveAppUrl('assets/audio/snippet-8.m4a'),
+  snippet9:resolveAppUrl('assets/audio/snippet-9.m4a'),
+};
+const SNIPPET_KEYS=['snippet8','snippet9'];
+
+function getAudioCtx(){
+  if(!audioCtx){
+    const Cls=window.AudioContext||window.webkitAudioContext;
+    if(Cls)audioCtx=new Cls();
+  }
+  return audioCtx;
 }
-function playAudioClip(audio,label){
-  try{
-    audio.pause();
-    audio.currentTime=0;
-    const playing=audio.play();
-    if(playing&&typeof playing.catch==='function')playing.catch(err=>console.warn(`${label} audio failed`,err));
-  }catch(e){}
+
+function getHtmlAudio(key){
+  if(!htmlAudios[key]){
+    const a=new Audio(AUDIO_SRCS[key]);
+    a.preload='auto';
+    a.load();
+    htmlAudios[key]=a;
+  }
+  return htmlAudios[key];
 }
-function ensureAudioBank(){
-  if(!eliminationAudio)eliminationAudio=buildAudio(ELIMINATION_SOUND_SRC);
-  if(!noFollowAudio)noFollowAudio=buildAudio(NO_FOLLOW_SOUND_SRC);
-  if(!badLayAudio)badLayAudio=buildAudio(BAD_LAY_SOUND_SRC);
-  if(!snippetAudios.length)snippetAudios=[eliminationAudio,noFollowAudio,badLayAudio,...EXTRA_SNIPPET_SRCS.map(buildAudio)];
+
+function loadAudioBuffer(key,url){
+  if(audioBuffers[key])return Promise.resolve(audioBuffers[key]);
+  return fetch(url)
+    .then(r=>{if(!r.ok)throw new Error(`HTTP ${r.status}`);return r.arrayBuffer();})
+    .then(arr=>new Promise((res,rej)=>{
+      const ctx=getAudioCtx();
+      if(!ctx)throw new Error('no ctx');
+      ctx.decodeAudioData(arr,res,rej);
+    }))
+    .then(buf=>{audioBuffers[key]=buf;return buf;})
+    .catch(err=>{console.warn('[audio] load failed:',key,err);return null;});
 }
-function allSnippetAudios(){
-  ensureAudioBank();
-  return snippetAudios;
-}
-function primeAudioBank(){
-  if(audioPrimed)return;
-  audioPrimed=true;
-  const bank=[...new Set(allSnippetAudios())];
-  bank.forEach(audio=>{
-    try{
-      audio.muted=true;
-      const playing=audio.play();
-      if(playing&&typeof playing.then==='function'){
-        playing.then(()=>{
-          audio.pause();
-          audio.currentTime=0;
-          audio.muted=false;
-        }).catch(()=>{
-          audio.muted=false;
-          audio.load();
-        });
-      }else{
-        audio.muted=false;
-        audio.load();
-      }
-    }catch(e){
-      audio.muted=false;
-      audio.load();
-    }
+
+function unlockAudio(){
+  if(audioUnlocked)return;
+  audioUnlocked=true;
+  const ctx=getAudioCtx();
+  if(ctx&&ctx.state==='suspended')ctx.resume().catch(()=>{});
+  Object.entries(AUDIO_SRCS).forEach(([k,url])=>loadAudioBuffer(k,url));
+  Object.keys(AUDIO_SRCS).forEach(key=>{
+    const a=getHtmlAudio(key);
+    a.muted=true;
+    const p=a.play();
+    if(p&&p.then)p.then(()=>{a.pause();a.currentTime=0;a.muted=false;}).catch(()=>{a.muted=false;});
+    else{a.pause();a.currentTime=0;a.muted=false;}
   });
 }
-function getEliminationAudio(){
-  ensureAudioBank();
-  return eliminationAudio;
-}
-function playEliminationSound(){
-  playAudioClip(getEliminationAudio(),'Elimination');
-}
-function getNoFollowAudio(){
-  ensureAudioBank();
-  return noFollowAudio;
-}
-function playNoFollowSound(){
-  playAudioClip(getNoFollowAudio(),'No-follow');
-}
-function getBadLayAudio(){
-  ensureAudioBank();
-  return badLayAudio;
-}
-function playBadLaySound(){
-  playAudioClip(getBadLayAudio(),'Bad-lay');
-}
-function playRandomSnippet(){
-  const pool=allSnippetAudios();
-  if(!pool.length)return;
-  let idx=Math.floor(Math.random()*pool.length);
-  if(pool.length>1&&idx===lastSnippetIndex){
-    idx=(idx+1+Math.floor(Math.random()*(pool.length-1)))%pool.length;
+
+function playAudioKey(key){
+  const ctx=getAudioCtx();
+  const buf=ctx?audioBuffers[key]:null;
+  if(ctx&&buf){
+    try{
+      if(ctx.state==='suspended')ctx.resume().catch(()=>{});
+      const src=ctx.createBufferSource();
+      src.buffer=buf;
+      src.connect(ctx.destination);
+      src.start(0);
+      return;
+    }catch(e){console.warn('[audio] ctx play failed:',e);}
   }
-  lastSnippetIndex=idx;
-  playAudioClip(pool[idx],'Random snippet');
+  const a=getHtmlAudio(key);
+  a.pause();a.currentTime=0;
+  a.play().catch(e=>console.warn('[audio] html play failed:',key,e));
 }
+
+function playRandomSnippet(){
+  let key=SNIPPET_KEYS[Math.floor(Math.random()*SNIPPET_KEYS.length)];
+  if(SNIPPET_KEYS.length>1&&key===lastSnippetKey)key=SNIPPET_KEYS.find(k=>k!==lastSnippetKey)||key;
+  lastSnippetKey=key;
+  playAudioKey(key);
+}
+
+function playEliminationSound(){playAudioKey('elimination');}
+function playNoFollowSound(){playAudioKey('noFollow');}
+function playBadLaySound(){playAudioKey('badLay');}
 
 // ---- Tableau sheet ----
 let sheetPlayerIdx=null,sheetData={};
@@ -1103,6 +1095,9 @@ function viewScores(){
         </div>
       </div>`;
     }).join('')}
+    <div style="text-align:center;margin-top:8px;">
+      <button class="btn btn-outline" style="font-size:11px;padding:6px 14px;opacity:.55;" data-act="testAudio">🔊 Tester les sons</button>
+    </div>
   `;
 }
 
@@ -1652,6 +1647,7 @@ document.addEventListener('click',ev=>{
     case 'redistribute':if(t.dataset.started==='1')state.draft.started=true;handleRedistribute();break;
     case 'validateRound':handleValidateRound();break;
     case 'clearDraft':state.draft=emptyDraft();render();showToast('Saisie effacée');break;
+    case 'testAudio':unlockAudio();playRandomSnippet();showToast('🔊 Test son…');break;
     case 'resetConfirm':if(confirm('Terminer la partie et en commencer une nouvelle ?'))resetGame();break;
     case 'newGame':resetGame();break;
   }
@@ -1674,8 +1670,8 @@ document.addEventListener('change',ev=>{
   }
 });
 
-document.addEventListener('pointerdown',primeAudioBank,{once:true});
-document.addEventListener('keydown',primeAudioBank,{once:true});
+document.addEventListener('pointerdown',unlockAudio,{once:true});
+document.addEventListener('keydown',unlockAudio,{once:true});
 
 document.addEventListener('input',ev=>{
   const t=ev.target.closest('[data-act]');

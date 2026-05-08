@@ -399,6 +399,14 @@
     font-family:var(--display);font-size:18px;font-weight:700;color:#fff;
     box-shadow:0 8px 22px rgba(232,69,69,.28);
   }
+  .calc-total.is-out{
+    background:linear-gradient(180deg,#ef4444 0%,#b91c1c 100%);
+    box-shadow:0 8px 22px rgba(185,28,28,.34);
+  }
+  .calc-total.is-capped{
+    background:linear-gradient(180deg,#f59e0b 0%,#b45309 100%);
+    box-shadow:0 8px 22px rgba(180,83,9,.28);
+  }
   .calc-total.is-empty{
     background:rgba(74,38,133,.5);color:var(--text-dim);
     box-shadow:none;border:1px solid var(--line);
@@ -451,6 +459,7 @@
     min-height:20px;color:var(--text-muted);font-size:12px;
     text-transform:uppercase;letter-spacing:.08em;margin-bottom:14px;
   }
+  .calc-summary strong{color:var(--gold-soft);font-weight:700}
   .calc-actions{display:flex;gap:10px}
   .calc-actions .btn{flex:1}
   .calc-actions .btn-primary{flex:1.4}
@@ -509,6 +518,7 @@ const RANKS=[
 const SUIT_BY_ID=Object.fromEntries(SUITS.map(s=>[s.id,s]));
 const RANK_BY_ID=Object.fromEntries(RANKS.map(r=>[r.id,r]));
 const ELIMINATION=151;
+const CARD_MALUS_MAX=51;
 const STORAGE_KEY='rami-v2';
 const PLAYER_COLORS=['#e84545','#4ade80','#c9a227','#7888a8'];
 const PLAYER_TEXT =['#f4ecd8','#1a0a2e','#1a0a2e','#f4ecd8'];
@@ -541,6 +551,7 @@ function freshSetup(){
       {name:'',score:0,eliminated:false},
     ],
     dealerIdx:0,rounds:[],tab:'enter',draft:emptyDraft(),
+    playForCoffee:null,coffeeDebts:[],
   };
 }
 function emptyDraft(){return{jokerRank:null,jokerSuit:null,started:false,perPlayer:{}}}
@@ -567,11 +578,24 @@ function cardCountsSummary(cardCounts){
 }
 function cardCalculatorValue(cardCounts){
   const counts=normalizeCardCounts(cardCounts);
-  if(!hasCardCounts(counts))return{malus:null,cardCounts:null,summary:''};
-  return{malus:cardCountsTotal(counts),cardCounts:counts,summary:cardCountsSummary(counts)};
+  if(!hasCardCounts(counts))return{malus:null,rawTotal:0,cardCounts:null,summary:'',capped:false};
+  const rawTotal=cardCountsTotal(counts);
+  return{malus:Math.min(rawTotal,CARD_MALUS_MAX),rawTotal,cardCounts:counts,summary:cardCountsSummary(counts),capped:rawTotal>CARD_MALUS_MAX};
 }
 function entryCardSummary(entry){
   return hasCardCounts(entry?.cardCounts)?`Cartes : ${cardCountsSummary(entry.cardCounts)}`:'';
+}
+function cardCalculatorMeta(playerIdx,cardCounts){
+  const p=state.players[playerIdx]||{score:0};
+  const result=cardCalculatorValue(cardCounts);
+  const projected=result.malus==null?p.score:p.score+result.malus;
+  return{
+    ...result,
+    hasCards:result.malus!=null,
+    playerScore:p.score,
+    projected,
+    willOut:result.malus!=null&&projected>=ELIMINATION,
+  };
 }
 function saveState(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(state))}catch(e){}}
 function loadState(){
@@ -580,6 +604,8 @@ function loadState(){
     if(!raw)return null;
     const s=JSON.parse(raw);
     if(!s.draft)s.draft=emptyDraft();
+    if(s.playForCoffee===undefined)s.playForCoffee=null;
+    if(!s.coffeeDebts)s.coffeeDebts=[];
     return s;
   }catch(e){return null}
 }
@@ -666,12 +692,12 @@ function openCardCalculator(source,idx){
   renderCardCalculator();
 }
 function closeCardCalculator(){calcContext=null;document.getElementById('calc-overlay')?.remove()}
-function setCalcRankCount(rankId,nextValue){
+function setCalcRankCount(rankId,nextValue,{focusQty=false}={}){
   if(!calcContext)return;
   const qty=Math.max(0,Math.min(20,Number.isFinite(nextValue)?nextValue:0));
   calcContext.cardCounts[rankId]=qty;
   calcContext.selectedRank=rankId;
-  renderCardCalculator();
+  renderCardCalculator({focusQty});
 }
 function clearCardCalculator(){
   if(!calcContext)return;
@@ -681,7 +707,7 @@ function clearCardCalculator(){
 }
 function applyCardCalculator(){
   if(!calcContext)return;
-  const result=cardCalculatorValue(calcContext.cardCounts);
+  const result=cardCalculatorMeta(calcContext.idx,calcContext.cardCounts);
   if(calcContext.source==='sheet'){
     sheetData.cardCounts=result.cardCounts?normalizeCardCounts(result.cardCounts):emptyCardCounts();
     sheetData.malus=result.malus;
@@ -695,17 +721,24 @@ function applyCardCalculator(){
   closeCardCalculator();
   render();
 }
-function renderCardCalculator(){
+function renderCardCalculator({focusQty=false}={}){
   document.getElementById('calc-overlay')?.remove();
   if(!calcContext)return;
   calcContext.cardCounts=normalizeCardCounts(calcContext.cardCounts);
   calcContext.selectedRank=RANK_BY_ID[calcContext.selectedRank]?calcContext.selectedRank:firstCalcRank(calcContext.cardCounts);
   const p=state.players[calcContext.idx];
-  const total=cardCountsTotal(calcContext.cardCounts);
-  const hasCards=hasCardCounts(calcContext.cardCounts);
+  const meta=cardCalculatorMeta(calcContext.idx,calcContext.cardCounts);
   const selectedRank=RANK_BY_ID[calcContext.selectedRank];
   const qty=calcContext.cardCounts[calcContext.selectedRank]||0;
-  const summary=hasCards?cardCountsSummary(calcContext.cardCounts):'Aucune carte sélectionnée';
+  const totalClass=!meta.hasCards?'is-empty':meta.willOut?'is-out':meta.capped?'is-capped':'';
+  const totalText=!meta.hasCards
+    ?'Sélectionne les cartes restantes'
+    :meta.willOut
+      ?`Joueur sorti = ${meta.projected} points`
+      :`Cartes restantes = ${meta.malus} point${meta.malus>1?'s':''} malus`;
+  const summary=!meta.hasCards
+    ?`Score actuel ${meta.playerScore} · 0 carte sélectionnée`
+    :`${meta.summary}${meta.capped?` · total cartes ${meta.rawTotal} · <strong>max ${CARD_MALUS_MAX} points</strong>`:''} · score projeté ${meta.projected}${meta.willOut?' · joueur sorti':''}`;
   const el=document.createElement('div');
   el.id='calc-overlay';el.className='calc-overlay';
   el.innerHTML=`
@@ -713,7 +746,7 @@ function renderCardCalculator(){
       <div class="sheet-handle"></div>
       <div class="sheet-lbl">Calculatrice cartes</div>
       <div class="sh-player">${avatar(p.name,calcContext.idx,'lg')}<div class="nm">${esc(p.name)}</div></div>
-      <div class="calc-total ${hasCards?'':'is-empty'}">${hasCards?`Cartes restantes = ${total} point${total>1?'s':''} malus`:'Sélectionne les cartes restantes'}</div>
+      <div class="calc-total ${totalClass}">${totalText}</div>
       <div class="calc-rank-grid">
         ${RANKS.map(r=>`<button class="calc-rank-btn ${calcContext.selectedRank===r.id?'active':''} ${calcContext.cardCounts[r.id]?'has-count':''}" data-calc-rank="${r.id}">${r.label}${calcContext.cardCounts[r.id]?`<span class="calc-rank-count">${calcContext.cardCounts[r.id]}</span>`:''}</button>`).join('')}
       </div>
@@ -740,15 +773,20 @@ function renderCardCalculator(){
   });
   el.querySelector('#calc-minus').onclick=()=>setCalcRankCount(calcContext.selectedRank,qty-1);
   el.querySelector('#calc-plus').onclick=()=>setCalcRankCount(calcContext.selectedRank,qty+1);
-  el.querySelector('#calc-qty').addEventListener('change',ev=>{
+  el.querySelector('#calc-qty').addEventListener('input',ev=>{
     const next=parseInt(ev.target.value,10);
-    setCalcRankCount(calcContext.selectedRank,isNaN(next)?0:next);
+    setCalcRankCount(calcContext.selectedRank,isNaN(next)?0:next,{focusQty:true});
   });
   el.querySelector('#calc-cancel').onclick=closeCardCalculator;
   el.querySelector('#calc-clear').onclick=clearCardCalculator;
   el.querySelector('#calc-ok').onclick=applyCardCalculator;
   el.addEventListener('click',ev=>{if(ev.target===el)closeCardCalculator()});
   document.body.appendChild(el);
+  if(focusQty){
+    const input=el.querySelector('#calc-qty');
+    input.focus();
+    input.setSelectionRange(String(input.value).length,String(input.value).length);
+  }
 }
 function renderSheet(){
   document.getElementById('sheet-overlay')?.remove();
@@ -1134,6 +1172,41 @@ function viewFinished(){
       <div class="panel-title">Récapitulatif</div>
       <div style="font-style:italic;color:var(--text-muted);text-align:center;font-size:14px;">${state.rounds.length} tour${state.rounds.length!==1?'s':''} joués · Le salon ferme ses portes…</div>
     </div>
+    ${state.playForCoffee&&state.coffeeDebts?.length?`
+    <div class="panel" style="border-color:rgba(201,162,39,.4);">
+      <div class="panel-title">☕ Consommations</div>
+      ${(()=>{
+        const losers=[...new Set(state.coffeeDebts.map(d=>d.from))];
+        const allDebtsSettled=state.coffeeDebts.every(d=>d.settled);
+        return losers.map(li=>{
+          const lDebts=state.coffeeDebts.filter(d=>d.from===li);
+          const allOk=lDebts.every(d=>d.settled);
+          const lp=state.players[li];
+          return`<div style="margin-bottom:16px;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+              ${avatar(lp.name,li,'sm')}
+              <span style="font-family:var(--display);font-size:16px;">${esc(lp.name)}</span>
+              <span style="font-size:11px;padding:2px 8px;border-radius:999px;${allOk?'background:rgba(74,222,128,.15);color:var(--green);':'background:rgba(232,69,69,.12);color:var(--red);'}">${allOk?'✓ Tout réglé':'☕ Café perdu'}</span>
+            </div>
+            ${lDebts.map(d=>{
+              const wp=state.players[d.to];
+              return`<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:rgba(15,6,32,.4);border-radius:10px;margin-bottom:6px;">
+                <div style="display:flex;align-items:center;gap:8px;font-size:14px;color:var(--text-dim);">
+                  <span style="color:var(--gold);">→</span>
+                  ${avatar(wp.name,d.to,'sm')}
+                  <span>${esc(wp.name)}</span>
+                  <span style="font-size:11px;color:var(--gold-soft);">☕ Café gagné</span>
+                </div>
+                ${d.settled
+                  ?`<span style="color:var(--green);font-size:13px;font-family:var(--display);font-weight:600;">✓ Réglé</span>`
+                  :`<button class="btn btn-ghost" style="padding:6px 14px;font-size:12px;border-color:rgba(201,162,39,.4);color:var(--gold-soft);" data-act="settleCoffee" data-from="${li}" data-to="${d.to}">Régler ☕</button>`
+                }
+              </div>`;
+            }).join('')}
+          </div>`;
+        }).join('')+`${allDebtsSettled?`<div style="text-align:center;color:var(--green);font-family:var(--display);font-size:16px;padding:8px 0;">✓ Toutes les consommations sont réglées</div>`:''}`;
+      })()}
+    </div>`:''}
     <button class="btn btn-primary btn-block" data-act="newGame">Nouvelle partie</button>
   </div>`;
 }
@@ -1322,6 +1395,20 @@ function autoCompleteRound(){
   }
 }
 
+function viewPickCoffee(){
+  return`<div class="content no-tabs fade-in">
+    <div class="setup-hero">
+      <div class="ornament">☕ ❦ ☕</div>
+      <h1>Consommation ?</h1>
+      <p>Les vainqueurs gagnent une consommation offerte par chaque perdant</p>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px;margin-top:8px;">
+      <button class="btn btn-primary btn-block" data-act="setCoffee" data-v="1" style="padding:20px;font-size:17px;">☕ Oui, on joue !</button>
+      <button class="btn btn-ghost btn-block" data-act="setCoffee" data-v="0" style="padding:18px;font-size:15px;">Non merci</button>
+    </div>
+  </div>`;
+}
+
 function viewPickDealer(){
   return`<div class="content no-tabs fade-in">
     <div class="setup-hero">
@@ -1349,6 +1436,8 @@ function render(){
     body=`<header class="header"><div class="brand">Rami</div><div class="brand-sub">Compteur de scores</div></header>${viewSetup()}`;
   }else if(state.screen==='pickDealer'){
     body=`<header class="header"><div class="brand">Rami</div><div class="brand-sub">Choix du distributeur</div></header>${viewPickDealer()}`;
+  }else if(state.screen==='pickCoffee'){
+    body=`<header class="header"><div class="brand">Rami</div><div class="brand-sub">Mise en jeu</div></header>${viewPickCoffee()}`;
   }else if(state.screen==='finished'){
     body=`<header class="header"><div class="brand">Fin de partie</div><div class="brand-sub">${state.rounds.length} tour${state.rounds.length!==1?'s':''} joués</div></header>${viewFinished()}`;
   }else{
@@ -1390,9 +1479,15 @@ document.addEventListener('click',ev=>{
     case 'chooseDealer':{
       const i=+t.dataset.i;
       state.dealerIdx=i;
+      state.screen='pickCoffee';
+      render();
+      break;
+    }
+    case 'setCoffee':{
+      state.playForCoffee=t.dataset.v==='1';
       state.screen='game';state.tab='enter';
       render();
-      showToast(`${state.players[i].name} distribue en premier`);
+      showToast(state.playForCoffee?'☕ On joue pour la consommation !':'Partie sans consommation');
       break;
     }
     case 'setTab':closeCardCalculator();closeSheet();state.tab=t.dataset.tab;render();break;
@@ -1438,6 +1533,12 @@ document.addEventListener('click',ev=>{
       break;
     }
     case 'undoRound':if(confirm('Annuler le dernier tour et corriger les scores ?'))undoLastRound();break;
+    case 'settleCoffee':{
+      const from=+t.dataset.from,to=+t.dataset.to;
+      const debt=state.coffeeDebts.find(d=>d.from===from&&d.to===to);
+      if(debt){debt.settled=true;saveState();render();}
+      break;
+    }
     case 'redistribute':handleRedistribute();break;
     case 'validateRound':handleValidateRound();break;
     case 'clearDraft':state.draft=emptyDraft();render();showToast('Saisie effacée');break;
@@ -1524,6 +1625,12 @@ function handleValidateRound(){
   state.dealerIdx=nextActiveAfter(state.dealerIdx);
   // Game ends when 2+ players are eliminated (remaining players are winners)
   if(state.players.filter(p=>p.eliminated).length>=2){
+    if(state.playForCoffee){
+      const ws=state.players.map((p,i)=>i).filter(i=>!state.players[i].eliminated);
+      const ls=state.players.map((p,i)=>i).filter(i=>state.players[i].eliminated);
+      state.coffeeDebts=[];
+      ls.forEach(l=>ws.forEach(w=>state.coffeeDebts.push({from:l,to:w,settled:false})));
+    }
     state.screen='finished';state.draft=emptyDraft();render();saveGame();return;
   }
   state.draft=emptyDraft();

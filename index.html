@@ -306,21 +306,26 @@
   .row-flex>*{flex:1}
   .mt-16{margin-top:16px}
   .toast{
-    position:fixed;top:calc(20px + var(--safe-top));left:50%;transform:translateX(-50%);
-    background:linear-gradient(180deg,var(--surface-3),var(--surface));border:1px solid var(--gold);
-    color:var(--gold-soft);padding:12px 22px;border-radius:999px;
+    position:fixed;bottom:calc(72px + var(--safe-bottom));left:50%;transform:translateX(-50%);
+    background:#2d1555;border:1px solid #c9a227;
+    color:#f4ecd8;padding:12px 22px;border-radius:999px;
     font-family:var(--display);font-size:14px;letter-spacing:.12em;text-transform:uppercase;
-    box-shadow:0 6px 22px rgba(0,0,0,.5),0 0 0 1px var(--gold-glow);z-index:100;
+    box-shadow:0 6px 22px rgba(0,0,0,.5),0 0 0 1px rgba(201,162,39,.3);z-index:100;
     animation:toastIn .3s cubic-bezier(.2,.8,.2,1);white-space:nowrap;pointer-events:none;
   }
-  @keyframes toastIn{from{transform:translate(-50%,-20px);opacity:0}to{transform:translate(-50%,0);opacity:1}}
+  @keyframes toastIn{from{transform:translate(-50%,12px);opacity:0}to{transform:translate(-50%,0);opacity:1}}
   .fade-in{animation:fadeIn .3s ease-out}
   @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
 </style>
 </head>
 <body>
 <div class="app" id="app"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
+const SUPABASE_URL = 'COLLE_TA_PROJECT_URL_ICI';
+const SUPABASE_KEY = 'COLLE_TA_CLE_ANON_ICI';
+const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
 const SUITS=[
   {id:'H',glyph:'♥',label:'Cœur',   color:'red',  opp:'S'},
   {id:'D',glyph:'♦',label:'Carreau',color:'red',  opp:'C'},
@@ -405,6 +410,46 @@ function showToast(text,ms=2400){
   t.id='toast';t.className='toast';t.textContent=text;
   document.body.appendChild(t);
   toastTimer=setTimeout(()=>t.remove(),ms);
+}
+
+// ---- Supabase ----
+async function saveGame(){
+  try{
+    const sorted=state.players.map((p,i)=>({...p,idx:i})).filter(p=>!p.eliminated).sort((a,b)=>a.score-b.score);
+    const winner=sorted[0]?.name||'—';
+    await db.from('parties').insert({
+      players:state.players,
+      scores:state.players.map(p=>p.score),
+      history:state.rounds,
+      winner,
+      finished:true,
+    });
+  }catch(e){}
+}
+
+async function loadSavedParties(){
+  const el=document.getElementById('saved-parties');
+  if(!el)return;
+  try{
+    const{data,error}=await db
+      .from('parties')
+      .select('winner,created_at,history')
+      .eq('finished',true)
+      .order('created_at',{ascending:false})
+      .limit(10);
+    if(error||!data?.length){el.innerHTML=`<div style="text-align:center;font-style:italic;color:var(--text-muted);padding:12px 0;">Aucune partie sauvegardée.</div>`;return}
+    el.innerHTML=data.map(p=>{
+      const date=new Date(p.created_at).toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric'});
+      const tours=(p.history||[]).filter(r=>!r.parole).length;
+      return`<div class="round-card" style="margin-bottom:10px;">
+        <div class="round-head">
+          <div class="round-num">${date}</div>
+          <div class="round-dealer">${esc(p.winner)}</div>
+        </div>
+        <div style="font-size:14px;color:var(--text-muted);font-style:italic;">${tours} tour${tours!==1?'s':''} joués</div>
+      </div>`;
+    }).join('');
+  }catch(e){el.innerHTML=''}
 }
 
 // ---- Views ----
@@ -585,8 +630,12 @@ function viewEnter(){
 }
 
 function viewHistory(){
-  if(!state.rounds.length)return`<div class="empty-history"><div class="ornament">❦</div><div style="font-family:var(--display);font-size:20px;color:var(--text-dim);margin-bottom:6px;">Aucun tour pour le moment</div><div>Saisis le premier tour dans l'onglet Saisir.</div></div>`;
-  return state.rounds.slice().reverse().map((r,ri)=>{
+  const savedSection=`<div class="panel" style="margin-top:16px;">
+    <div class="panel-title">Parties sauvegardées</div>
+    <div id="saved-parties"><div style="text-align:center;font-style:italic;color:var(--text-muted);padding:12px 0;">Chargement…</div></div>
+  </div>`;
+  if(!state.rounds.length)return`<div class="empty-history"><div class="ornament">❦</div><div style="font-family:var(--display);font-size:20px;color:var(--text-dim);margin-bottom:6px;">Aucun tour pour le moment</div><div>Saisis le premier tour dans l'onglet Saisir.</div></div>${savedSection}`;
+  const localRounds=state.rounds.slice().reverse().map((r,ri)=>{
     const num=state.rounds.length-ri;
     const dealerName=state.players[r.dealerIdx]?.name||'—';
     if(r.parole)return`<div class="round-card"><div class="round-head"><div class="round-num">Tour ${num} · Parole</div><div class="round-dealer">${esc(dealerName)}</div></div><div class="round-parole">↻ Redistribution ${r.dealerAdvanced?'· distributeur avancé':'· même distributeur'}</div></div>`;
@@ -611,6 +660,7 @@ function viewHistory(){
       }).join('')}
     </div>`;
   }).join('');
+  return localRounds+savedSection;
 }
 
 function viewFinished(){
@@ -659,6 +709,7 @@ function render(){
   }
   root.innerHTML=body;
   saveState();
+  if(state.screen==='game'&&state.tab==='history')loadSavedParties();
 }
 
 // ---- Event handling ----
@@ -773,7 +824,7 @@ function handleValidateRound(){
   state.rounds.push({parole:false,dealerIdx:state.dealerIdx,jokerRank:d.jokerRank,jokerSuit:d.jokerSuit,started:d.started,entries});
   state.dealerIdx=nextActiveAfter(state.dealerIdx);
   if(state.players.filter(p=>!p.eliminated).length<=1){
-    state.screen='finished';state.draft=emptyDraft();render();return;
+    state.screen='finished';state.draft=emptyDraft();render();saveGame();return;
   }
   state.draft=emptyDraft();state.tab='scores';render();
   const newlyOut=entries.filter(e=>{const p=state.players[e.idx];return p.eliminated&&p.score-e.delta<ELIMINATION});

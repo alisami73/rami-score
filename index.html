@@ -519,6 +519,9 @@ const SUIT_BY_ID=Object.fromEntries(SUITS.map(s=>[s.id,s]));
 const RANK_BY_ID=Object.fromEntries(RANKS.map(r=>[r.id,r]));
 const ELIMINATION=151;
 const CARD_MALUS_MAX=51;
+const ELIMINATION_SOUND_SRC='assets/audio/joueur-sorti.m4a';
+const NO_FOLLOW_SOUND_SRC='assets/audio/sans-suivi-51.m4a';
+const BAD_LAY_SOUND_SRC='assets/audio/etalage-incomplet.m4a';
 const STORAGE_KEY='rami-v2';
 const PLAYER_COLORS=['#e84545','#4ade80','#c9a227','#7888a8'];
 const PLAYER_TEXT =['#f4ecd8','#1a0a2e','#1a0a2e','#f4ecd8'];
@@ -540,6 +543,9 @@ function persistCustomName(name){
 
 let state=loadState()||freshSetup();
 let toastTimer=null;
+let eliminationAudio=null;
+let noFollowAudio=null;
+let badLayAudio=null;
 
 function freshSetup(){
   return{
@@ -662,6 +668,51 @@ function showToast(text,ms=2400){
   t.id='toast';t.className='toast';t.textContent=text;
   document.body.appendChild(t);
   toastTimer=setTimeout(()=>t.remove(),ms);
+}
+function getEliminationAudio(){
+  if(!eliminationAudio){
+    eliminationAudio=new Audio(ELIMINATION_SOUND_SRC);
+    eliminationAudio.preload='auto';
+  }
+  return eliminationAudio;
+}
+function playEliminationSound(){
+  try{
+    const audio=getEliminationAudio();
+    audio.currentTime=0;
+    const playing=audio.play();
+    if(playing&&typeof playing.catch==='function')playing.catch(()=>{});
+  }catch(e){}
+}
+function getNoFollowAudio(){
+  if(!noFollowAudio){
+    noFollowAudio=new Audio(NO_FOLLOW_SOUND_SRC);
+    noFollowAudio.preload='auto';
+  }
+  return noFollowAudio;
+}
+function playNoFollowSound(){
+  try{
+    const audio=getNoFollowAudio();
+    audio.currentTime=0;
+    const playing=audio.play();
+    if(playing&&typeof playing.catch==='function')playing.catch(()=>{});
+  }catch(e){}
+}
+function getBadLayAudio(){
+  if(!badLayAudio){
+    badLayAudio=new Audio(BAD_LAY_SOUND_SRC);
+    badLayAudio.preload='auto';
+  }
+  return badLayAudio;
+}
+function playBadLaySound(){
+  try{
+    const audio=getBadLayAudio();
+    audio.currentTime=0;
+    const playing=audio.play();
+    if(playing&&typeof playing.catch==='function')playing.catch(()=>{});
+  }catch(e){}
 }
 
 // ---- Tableau sheet ----
@@ -938,7 +989,7 @@ function viewSetup(){
         <li>◆ A / V / D / R = 10 pts · cartes numériques = valeur</li>
         <li>◆ Pénalité <strong style="color:var(--gold-soft)">+51</strong> sans suivi ou étalage erroné</li>
         <li>◆ Joker = même valeur, couleur opposée (rouge → ♠/♣ · noir → ♥/♦)</li>
-        <li>◆ Parole : même distrib. si non entamé, sinon distrib. avance</li>
+        <li>◆ Parole : même distrib. si non commencé, sinon distrib. avance</li>
       </ul>
     </div>
     <button class="btn btn-primary btn-block" data-act="startGame">Commencer la partie ›</button>
@@ -1040,7 +1091,7 @@ function viewEnter(){
 
     <div class="panel">
       <div class="switch-row">
-        <div class="lbl">Tour entamé<em>Au moins une carte tirée du talon</em></div>
+        <div class="lbl">Tour commencé<em>Au moins une carte tirée du talon</em></div>
         <button class="switch ${d.started?'on':''}" data-act="toggleStarted"></button>
       </div>
     </div>
@@ -1087,7 +1138,7 @@ function viewEnter(){
       ?`<div class="panel" style="text-align:center;border-color:var(--blue-gray);">
           <div style="font-family:var(--display);font-size:18px;color:var(--blue-gray-2);letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px;">Tous parole</div>
           <div style="font-style:italic;color:var(--text-muted);font-size:14px;">
-            ${d.started?'Tour entamé — le distributeur passe à gauche.':'Tour non entamé — même distributeur.'}
+            ${d.started?'Tour commencé — le distributeur passe à gauche.':'Tour non commencé — même distributeur.'}
           </div>
           <button class="btn btn-primary btn-block mt-16" data-act="redistribute">↻ Redistribuer</button>
         </div>`
@@ -1343,7 +1394,7 @@ function viewTableau(){
       ?`<button class="btn btn-primary btn-block" data-act="validateRound">Valider le tour ${state.rounds.length+1} ›</button>`
       :`<div style="text-align:center;font-style:italic;color:var(--text-muted);font-size:13px;">Clique sur une cellule <span style="color:var(--gold);">Calcul</span> pour ouvrir la saisie</div>`
     }
-    <button class="btn btn-ghost btn-block" data-act="redistribute" style="margin-top:10px;">↻ Nouvelle distribution</button>`;
+    <button class="btn btn-ghost btn-block" data-act="redistribute" data-started="1" style="margin-top:10px;">↻ Nouvelle distribution</button>`;
 }
 
 function undoLastRound(){
@@ -1539,7 +1590,7 @@ document.addEventListener('click',ev=>{
       if(debt){debt.settled=true;saveState();render();}
       break;
     }
-    case 'redistribute':handleRedistribute();break;
+    case 'redistribute':if(t.dataset.started==='1')state.draft.started=true;handleRedistribute();break;
     case 'validateRound':handleValidateRound();break;
     case 'clearDraft':state.draft=emptyDraft();render();showToast('Saisie effacée');break;
     case 'resetConfirm':if(confirm('Terminer la partie et en commencer une nouvelle ?'))resetGame();break;
@@ -1621,6 +1672,12 @@ function handleValidateRound(){
     state.players[e.idx].score+=e.delta;
     if(state.players[e.idx].score>=ELIMINATION)state.players[e.idx].eliminated=true;
   });
+  const badLayTriggered=entries.some(e=>e.p51badLay);
+  const noFollowTriggered=entries.some(e=>e.p51noFollow);
+  const newlyOut=entries.filter(e=>{const p=state.players[e.idx];return p.eliminated&&p.score-e.delta<ELIMINATION});
+  if(badLayTriggered)playBadLaySound();
+  else if(noFollowTriggered)playNoFollowSound();
+  else if(newlyOut.length)playEliminationSound();
   state.rounds.push({parole:false,dealerIdx:state.dealerIdx,jokerRank:d.jokerRank,jokerSuit:d.jokerSuit,started:d.started,entries});
   state.dealerIdx=nextActiveAfter(state.dealerIdx);
   // Game ends when 2+ players are eliminated (remaining players are winners)
@@ -1631,12 +1688,13 @@ function handleValidateRound(){
       state.coffeeDebts=[];
       ls.forEach(l=>ws.forEach(w=>state.coffeeDebts.push({from:l,to:w,settled:false})));
     }
-    state.screen='finished';state.draft=emptyDraft();render();saveGame();return;
+    state.screen='finished';state.draft=emptyDraft();render();
+    if(newlyOut.length)showToast(`${state.players[newlyOut[0].idx].name} éliminé !`);
+    saveGame();return;
   }
   state.draft=emptyDraft();
   if(state.tab!=='tableau')state.tab='scores';
   render();
-  const newlyOut=entries.filter(e=>{const p=state.players[e.idx];return p.eliminated&&p.score-e.delta<ELIMINATION});
   const toastMsg=newlyOut.length?`${state.players[newlyOut[0].idx].name} éliminé !`:isEtIncomplet?`Étalage incomplet — ${state.players[badLayIdx].name} +51`:winnerIdx!=null?`Tour gagné par ${state.players[winnerIdx].name}`:'Tour validé';
   showToast(toastMsg);
 }

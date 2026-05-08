@@ -200,10 +200,13 @@
   .card-face.small .center{font-size:26px}
 
   /* Joker stage */
-  .joker-stage{display:flex;align-items:center;justify-content:center;gap:18px;padding:12px 0 18px}
+  .joker-stage{display:flex;align-items:center;justify-content:center;gap:18px;padding:12px 0 18px;flex-wrap:wrap}
   .joker-arrow{color:var(--gold);font-size:22px;opacity:.7}
   .joker-label{text-align:center;margin-top:8px;font-size:12px;text-transform:uppercase;letter-spacing:.18em;color:var(--text-muted)}
   .joker-label.is-gold{color:var(--gold-soft)}
+  .joker-result{display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;max-width:160px}
+  .joker-result.small{max-width:none}
+  .joker-sep{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--text-muted)}
   .rank-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-bottom:14px}
   .rank-btn{
     aspect-ratio:1;border-radius:8px;background:rgba(15,6,32,.55);border:1px solid var(--line-soft);
@@ -300,13 +303,71 @@
     border-top:1px solid var(--line-soft);padding-bottom:var(--safe-bottom);z-index:50;
   }
   .tabs::before{content:"";position:absolute;top:0;left:50%;transform:translateX(-50%);width:100px;height:1px;background:linear-gradient(90deg,transparent,var(--gold),transparent)}
-  .tabs-inner{display:grid;grid-template-columns:repeat(3,1fr)}
+  .tabs-inner{display:grid;grid-template-columns:repeat(4,1fr)}
   .tab{padding:12px 0 14px;text-align:center;color:var(--text-muted);transition:color .2s;position:relative}
   .tab .ico{display:block;font-size:22px;margin-bottom:4px;line-height:1}
   .tab .lbl{font-family:var(--display);font-size:11px;letter-spacing:.2em;text-transform:uppercase}
   .tab.active{color:var(--gold-soft)}
   .tab.active .ico{color:var(--gold)}
   .tab.active::before{content:"";position:absolute;top:0;left:50%;transform:translateX(-50%);width:28px;height:2px;background:var(--gold);border-radius:2px}
+
+  /* Tableau */
+  .tableau-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .stbl{width:100%;border-collapse:separate;border-spacing:0;font-family:var(--display)}
+  .stbl th{
+    background:var(--surface);padding:8px 4px 6px;font-size:9px;text-transform:uppercase;
+    letter-spacing:.12em;color:var(--gold-soft);text-align:center;
+    border-bottom:2px solid var(--gold-deep);position:sticky;top:0;z-index:2;
+  }
+  .stbl th.th-round{width:30px;font-size:9px;color:var(--text-muted);padding:8px 2px}
+  .stbl td{padding:5px 3px;text-align:center;border-bottom:1px solid var(--line-soft);vertical-align:middle;min-width:66px}
+  .stbl td.td-round{font-size:10px;color:var(--text-muted);border-right:1px solid var(--line-soft);padding:4px 5px;width:28px}
+  .stbl .row-current td{background:rgba(201,162,39,.05)}
+  .stbl .row-total td{background:var(--surface);border-top:2px solid var(--gold-deep);font-size:16px;font-weight:700;padding:8px 4px}
+  .ci{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:34px;gap:1px;border-radius:6px}
+  .ci-total{font-size:14px;font-variant-numeric:tabular-nums;font-weight:600}
+  .ci-delta{font-size:10px;color:var(--text-muted);font-weight:400}
+  .ci-win .ci-total{color:var(--gold-soft)}
+  .ci-win .ci-delta{color:var(--gold-deep)}
+  .ci-pen .ci-total{color:var(--red)}
+  .ci-out{color:var(--red);font-size:10px;font-style:italic}
+  .ci-tap{cursor:pointer;transition:background .12s}
+  .ci-tap:active .ci{background:rgba(201,162,39,.12)}
+  .ci-empty{color:var(--text-muted);font-size:22px;line-height:1}
+  .ichips{display:flex;gap:2px;justify-content:center;flex-wrap:wrap;margin-top:2px}
+  .ic{font-size:8px;padding:1px 3px;border-radius:3px;font-family:var(--display);font-weight:700;letter-spacing:.04em}
+  .ic-d{background:rgba(201,162,39,.25);color:var(--gold)}
+  .ic-e{background:rgba(74,222,128,.2);color:var(--green)}
+  .ic-51{background:rgba(232,69,69,.22);color:var(--red)}
+  .ic-par{background:rgba(120,136,168,.2);color:var(--blue-gray-2)}
+  .th-pl-score{font-size:13px;font-variant-numeric:tabular-nums}
+
+  /* Bottom sheet */
+  .sheet-overlay{
+    position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:80;
+    display:flex;align-items:flex-end;justify-content:center;
+    animation:fadeIn .2s ease-out;
+  }
+  .sheet{
+    background:linear-gradient(180deg,#3a1d6b 0%,#1a0a2e 100%);
+    border-radius:20px 20px 0 0;padding:0 18px calc(24px + var(--safe-bottom));
+    width:100%;max-width:520px;border-top:1px solid var(--gold-deep);
+    box-shadow:0 -8px 40px rgba(0,0,0,.6);
+    animation:sheetUp .25s cubic-bezier(.2,.8,.2,1);
+  }
+  @keyframes sheetUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+  .sheet-handle{width:40px;height:4px;background:var(--line);border-radius:2px;margin:12px auto 16px}
+  .sheet-lbl{font-family:var(--display);font-size:12px;text-transform:uppercase;letter-spacing:.2em;color:var(--gold-soft);text-align:center;margin-bottom:12px}
+  .sh-player{display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:18px}
+  .sh-player .nm{font-family:var(--display);font-size:22px}
+  .win-btn{
+    display:flex;align-items:center;justify-content:center;gap:8px;
+    padding:13px;border-radius:12px;width:100%;margin-bottom:10px;
+    background:rgba(201,162,39,.1);border:1px solid var(--gold-deep);
+    font-family:var(--display);font-size:14px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--gold-soft);transition:all .15s;
+  }
+  .win-btn.on{background:linear-gradient(180deg,var(--gold-soft),var(--gold-deep));color:#1a0a2e;border-color:var(--gold);font-weight:700}
 
   /* Game over */
   .gameover{text-align:center;padding:30px 12px 20px}
@@ -347,10 +408,10 @@ const SUPABASE_KEY = 'sb_publishable_XgaPf4tGVuc4wH7bVjZXsA_FB5y7-8c';
 const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const SUITS=[
-  {id:'H',glyph:'♥',label:'Cœur',   color:'red',  opp:'S'},
-  {id:'D',glyph:'♦',label:'Carreau',color:'red',  opp:'C'},
-  {id:'S',glyph:'♠',label:'Pique',  color:'black',opp:'H'},
-  {id:'C',glyph:'♣',label:'Trèfle', color:'black',opp:'D'},
+  {id:'H',glyph:'♥',label:'Cœur',   color:'red'},
+  {id:'D',glyph:'♦',label:'Carreau',color:'red'},
+  {id:'S',glyph:'♠',label:'Pique',  color:'black'},
+  {id:'C',glyph:'♣',label:'Trèfle', color:'black'},
 ];
 const RANKS=[
   {id:'A', label:'A', pts:10},{id:'2', label:'2', pts:2},{id:'3', label:'3', pts:3},
@@ -397,6 +458,7 @@ function freshSetup(){
   };
 }
 function emptyDraft(){return{jokerRank:null,jokerSuit:null,started:false,perPlayer:{}}}
+// perPlayer entry shape: {isWinner, malus, p51noFollow, p51badLay, parole, etale}
 function saveState(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(state))}catch(e){}}
 function loadState(){
   try{
@@ -438,6 +500,21 @@ function cardHTML(rankId,suitId,small=false){
   return`<div class="card-face ${cls}${sz}"><div class="corner tl"><span class="v">${r.label}</span><span class="s">${s.glyph}</span></div><div class="center">${s.glyph}</div><div class="corner br"><span class="v">${r.label}</span><span class="s">${s.glyph}</span></div></div>`;
 }
 
+function jokerCandidateSuits(suitId){
+  const baseSuit=SUIT_BY_ID[suitId];
+  if(!baseSuit)return[];
+  return SUITS.filter(s=>s.color!==baseSuit.color);
+}
+
+function jokerCardsHTML(rankId,suitId,small=false){
+  const suits=jokerCandidateSuits(suitId);
+  const cls=`joker-result${small?' small':''}`;
+  const cards=suits.length
+    ? suits.map(s=>cardHTML(rankId,s.id,small))
+    : [cardHTML(null,null,small),cardHTML(null,null,small)];
+  return`<div class="${cls}">${cards.join('<span class="joker-sep">ou</span>')}</div>`;
+}
+
 function showToast(text,ms=2400){
   document.getElementById('toast')?.remove();
   if(toastTimer)clearTimeout(toastTimer);
@@ -445,6 +522,66 @@ function showToast(text,ms=2400){
   t.id='toast';t.className='toast';t.textContent=text;
   document.body.appendChild(t);
   toastTimer=setTimeout(()=>t.remove(),ms);
+}
+
+// ---- Tableau sheet ----
+let sheetPlayerIdx=null,sheetData={};
+function openSheet(idx){
+  const e=state.draft.perPlayer[idx]||{};
+  sheetPlayerIdx=idx;
+  sheetData={isWinner:!!e.isWinner,malus:e.malus??null,p51noFollow:!!e.p51noFollow,p51badLay:!!e.p51badLay,etale:!!e.etale};
+  renderSheet();
+}
+function closeSheet(){sheetPlayerIdx=null;sheetData={};document.getElementById('sheet-overlay')?.remove()}
+function applySheet(){
+  if(sheetPlayerIdx===null)return;
+  const idx=sheetPlayerIdx;
+  if(sheetData.isWinner)activeIndices().forEach(j=>{if(state.draft.perPlayer[j])state.draft.perPlayer[j].isWinner=false});
+  state.draft.perPlayer[idx]={isWinner:sheetData.isWinner,malus:sheetData.malus,p51noFollow:sheetData.p51noFollow,p51badLay:sheetData.p51badLay,etale:sheetData.etale,parole:false};
+  closeSheet();render();
+}
+function renderSheet(){
+  document.getElementById('sheet-overlay')?.remove();
+  if(sheetPlayerIdx===null)return;
+  const p=state.players[sheetPlayerIdx];
+  const hasPen=sheetData.p51noFollow||sheetData.p51badLay;
+  const penPts=(sheetData.p51noFollow?51:0)+(sheetData.p51badLay?51:0);
+  const el=document.createElement('div');
+  el.id='sheet-overlay';el.className='sheet-overlay';
+  el.innerHTML=`
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-lbl">Saisir le score</div>
+      <div class="sh-player">${avatar(p.name,sheetPlayerIdx,'lg')}<div class="nm">${esc(p.name)}</div></div>
+      <button class="win-btn ${sheetData.isWinner?'on':''}" id="sh-win">★ &nbsp; Gagnant — 0 point</button>
+      <div style="text-align:center;color:var(--text-muted);font-style:italic;font-size:13px;margin:8px 0;">— ou —</div>
+      ${!sheetData.isWinner?`
+        ${hasPen
+          ?`<div style="text-align:center;color:var(--red);font-size:15px;padding:10px 0;">Pénalité : +${penPts} pts</div>`
+          :`<input type="number" id="sh-malus" inputmode="numeric" min="0" max="300" placeholder="Points de cartes restantes" value="${sheetData.malus??''}" style="width:100%;background:rgba(15,6,32,.6);border:1px solid var(--line-soft);border-radius:10px;padding:12px 14px;color:var(--text);font-family:var(--serif);font-size:18px;outline:none;margin-bottom:10px;display:block;-moz-appearance:textfield;">`
+        }
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+          <button class="chip ${sheetData.p51noFollow?'on':''}" id="sh-nf"><span class="plus">+51</span> sans suivi</button>
+          <button class="chip ${sheetData.p51badLay?'on':''}" id="sh-bl"><span class="plus">+51</span> étalage incomplet</button>
+        </div>
+      `:''}
+      <div style="margin-bottom:14px;">
+        <button class="chip ${sheetData.etale?'on':''}" id="sh-et" style="${sheetData.etale?'background:rgba(74,222,128,.15);border-color:var(--green);color:var(--green);':''}">⤵ Étalé</button>
+      </div>
+      <div style="display:flex;gap:10px;">
+        <button id="sh-cancel" class="btn btn-ghost" style="flex:1;">Annuler</button>
+        <button id="sh-ok" class="btn btn-primary" style="flex:2;">Confirmer</button>
+      </div>
+    </div>`;
+  el.querySelector('#sh-win').onclick=()=>{sheetData.isWinner=!sheetData.isWinner;if(sheetData.isWinner){sheetData.p51noFollow=false;sheetData.p51badLay=false;sheetData.malus=null}renderSheet()};
+  el.querySelector('#sh-nf')?.onclick=()=>{sheetData.p51noFollow=!sheetData.p51noFollow;sheetData.isWinner=false;renderSheet()};
+  el.querySelector('#sh-bl')?.onclick=()=>{sheetData.p51badLay=!sheetData.p51badLay;sheetData.isWinner=false;renderSheet()};
+  el.querySelector('#sh-et').onclick=()=>{sheetData.etale=!sheetData.etale;renderSheet()};
+  el.querySelector('#sh-malus')?.addEventListener('input',ev=>{const v=parseInt(ev.target.value,10);sheetData.malus=isNaN(v)?null:Math.max(0,v)});
+  el.querySelector('#sh-cancel').onclick=closeSheet;
+  el.querySelector('#sh-ok').onclick=applySheet;
+  el.addEventListener('click',ev=>{if(ev.target===el)closeSheet()});
+  document.body.appendChild(el);
 }
 
 // ---- Supabase ----
@@ -531,7 +668,7 @@ function viewSetup(){
         <li>◆ Élimination à <strong style="color:var(--red)">151 points</strong></li>
         <li>◆ A / V / D / R = 10 pts · cartes numériques = valeur</li>
         <li>◆ Pénalité <strong style="color:var(--gold-soft)">+51</strong> sans suivi ou étalage erroné</li>
-        <li>◆ Joker = même valeur, couleur opposée (♥↔♠ · ♦↔♣)</li>
+        <li>◆ Joker = même valeur, couleur opposée (rouge → ♠/♣ · noir → ♥/♦)</li>
         <li>◆ Parole : même distrib. si non entamé, sinon distrib. avance</li>
       </ul>
     </div>
@@ -540,7 +677,11 @@ function viewSetup(){
 }
 
 function viewGame(){
-  const body=state.tab==='scores'?viewScores():state.tab==='history'?viewHistory():viewEnter();
+  const body=
+    state.tab==='scores'?viewScores():
+    state.tab==='history'?viewHistory():
+    state.tab==='tableau'?viewTableau():
+    viewEnter();
   return`<div class="content fade-in">${body}</div>${viewTabs()}`;
 }
 
@@ -549,6 +690,7 @@ function viewTabs(){
   return`<nav class="tabs"><div class="tabs-inner">
     <button class="tab ${t==='scores'?'active':''}" data-act="setTab" data-tab="scores"><span class="ico">♛</span><span class="lbl">Scores</span></button>
     <button class="tab ${t==='enter'?'active':''}" data-act="setTab" data-tab="enter"><span class="ico">✎</span><span class="lbl">Saisir</span></button>
+    <button class="tab ${t==='tableau'?'active':''}" data-act="setTab" data-tab="tableau"><span class="ico">⊞</span><span class="lbl">Tableau</span></button>
     <button class="tab ${t==='history'?'active':''}" data-act="setTab" data-tab="history"><span class="ico">❦</span><span class="lbl">Historique</span></button>
   </div></nav>`;
 }
@@ -596,8 +738,6 @@ function viewEnter(){
   const allParole=active.length>0&&active.every(i=>d.perPlayer[i]?.parole);
   const winnerIdx=active.find(i=>d.perPlayer[i]?.isWinner);
   const hasJoker=d.jokerRank&&d.jokerSuit;
-  const jSuit=hasJoker?SUIT_BY_ID[d.jokerSuit]:null;
-  const oppSuit=jSuit?SUIT_BY_ID[jSuit.opp]:null;
 
   return`
     <div class="panel panel-gold">
@@ -616,7 +756,7 @@ function viewEnter(){
       <div class="joker-stage">
         <div>${cardHTML(d.jokerRank,d.jokerSuit)}<div class="joker-label">Carte retournée</div></div>
         <div class="joker-arrow">➜</div>
-        <div>${hasJoker?cardHTML(d.jokerRank,oppSuit.id):cardHTML(null,null)}<div class="joker-label is-gold">Joker</div></div>
+        <div>${jokerCardsHTML(hasJoker?d.jokerRank:null,hasJoker?d.jokerSuit:null,true)}<div class="joker-label is-gold">Jokers possibles</div></div>
       </div>
       <div style="font-size:13px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.16em;margin-bottom:8px;">Valeur</div>
       <div class="rank-grid">
@@ -694,11 +834,9 @@ function viewHistory(){
     const num=state.rounds.length-ri;
     const dealerName=state.players[r.dealerIdx]?.name||'—';
     if(r.parole)return`<div class="round-card"><div class="round-head"><div class="round-num">Tour ${num} · Parole</div><div class="round-dealer">${esc(dealerName)}</div></div><div class="round-parole">↻ Redistribution ${r.dealerAdvanced?'· distributeur avancé':'· même distributeur'}</div></div>`;
-    const js=r.jokerSuit?SUIT_BY_ID[r.jokerSuit]:null;
-    const os=js?SUIT_BY_ID[js.opp]:null;
     return`<div class="round-card">
       <div class="round-head"><div class="round-num">Tour ${num}</div><div class="round-dealer">${esc(dealerName)} donne</div></div>
-      ${r.jokerRank&&r.jokerSuit?`<div class="round-joker"><span class="mini-tag">Joker :</span>${cardHTML(r.jokerRank,r.jokerSuit,true)}<span class="joker-arrow" style="font-size:16px;">➜</span>${cardHTML(r.jokerRank,os.id,true)}</div>`:''}
+      ${r.jokerRank&&r.jokerSuit?`<div class="round-joker"><span class="mini-tag">Jokers :</span>${cardHTML(r.jokerRank,r.jokerSuit,true)}<span class="joker-arrow" style="font-size:16px;">➜</span>${jokerCardsHTML(r.jokerRank,r.jokerSuit,true)}</div>`:''}
       ${r.entries.map(e=>{
         const tags=[];
         if(e.p51noFollow)tags.push('+51 sans suivi');
@@ -750,6 +888,128 @@ function viewFinished(){
     </div>
     <button class="btn btn-primary btn-block" data-act="newGame">Nouvelle partie</button>
   </div>`;
+}
+
+function viewTableau(){
+  ensureDealerActive();
+  const d=state.draft;
+  const dealer=state.dealerIdx;
+  const n=state.players.length;
+  const active=activeIndices();
+  const winnerIdx=active.find(i=>d.perPlayer[i]?.isWinner);
+
+  // Compute running totals from rounds history
+  const runTotals=new Array(n).fill(0);
+
+  const pastRows=state.rounds.map((r,ri)=>{
+    const rowHtml=state.players.map((p,i)=>{
+      if(r.parole){
+        return`<td><div class="ci"><span class="ic ic-par">↻</span></div></td>`;
+      }
+      const e=r.entries.find(x=>x.idx===i);
+      if(!e){
+        return`<td><div class="ci"><span class="ci-out">—</span></div></td>`;
+      }
+      runTotals[i]+=e.delta;
+      const chips=[];
+      if(r.dealerIdx===i)chips.push(`<span class="ic ic-d">D</span>`);
+      if(e.etale)chips.push(`<span class="ic ic-e">E</span>`);
+      if(e.p51noFollow)chips.push(`<span class="ic ic-51">51</span>`);
+      if(e.p51badLay)chips.push(`<span class="ic ic-51">51!</span>`);
+      if(e.isWinner){
+        return`<td><div class="ci ci-win">
+          <span class="ci-total">★</span>
+          ${chips.length?`<div class="ichips">${chips.join('')}</div>`:''}
+        </div></td>`;
+      }
+      const hasPen=e.p51noFollow||e.p51badLay;
+      return`<td><div class="ci ${hasPen?'ci-pen':''}">
+        <span class="ci-total">${runTotals[i]}</span>
+        <span class="ci-delta">+${e.delta}</span>
+        ${chips.length?`<div class="ichips">${chips.join('')}</div>`:''}
+      </div></td>`;
+    }).join('');
+    const roundLabel=r.parole?`${ri+1}<span class="ic ic-par" style="display:inline-block;margin-left:2px;">↻</span>`:String(ri+1);
+    const isDealerRow=r.dealerIdx===dealer;
+    return`<tr><td class="td-round">${roundLabel}</td>${rowHtml}</tr>`;
+  });
+
+  // Current round cells
+  const currentCells=state.players.map((p,i)=>{
+    if(p.eliminated)return`<td><div class="ci"><span class="ci-out">Sorti</span></div></td>`;
+    const e=d.perPlayer[i]||{};
+    const isD=i===dealer;
+    if(e.isWinner){
+      return`<td class="ci-tap" data-act="tapCell" data-i="${i}"><div class="ci ci-win">${isD?'<span class="ic ic-d">D</span>':''}<span class="ci-total">★</span>${e.etale?'<span class="ic ic-e">E</span>':''}</div></td>`;
+    }
+    const hasPen=e.p51noFollow||e.p51badLay;
+    const penPts=(e.p51noFollow?51:0)+(e.p51badLay?51:0);
+    if(hasPen){
+      return`<td class="ci-tap" data-act="tapCell" data-i="${i}"><div class="ci ci-pen">${isD?'<span class="ic ic-d">D</span>':''}<span class="ci-total">+${penPts}</span>${e.etale?'<span class="ic ic-e">E</span>':''}</div></td>`;
+    }
+    if(e.malus!==null&&e.malus!==undefined&&!isNaN(e.malus)){
+      return`<td class="ci-tap" data-act="tapCell" data-i="${i}"><div class="ci">${isD?'<span class="ic ic-d">D</span>':''}<span class="ci-total">${e.malus}</span>${e.etale?'<span class="ic ic-e">E</span>':''}</div></td>`;
+    }
+    return`<td class="ci-tap" data-act="tapCell" data-i="${i}"><div class="ci">${isD?'<span class="ic ic-d" style="margin-bottom:2px;">D</span>':''}<span class="ci-empty">＋</span></div></td>`;
+  }).join('');
+
+  // Validate button check
+  const canValidate=winnerIdx!=null&&active.every(i=>{
+    if(i===winnerIdx)return true;
+    const e=d.perPlayer[i]||{};
+    if(e.parole||e.p51noFollow||e.p51badLay)return true;
+    return e.malus!==null&&!isNaN(e.malus);
+  });
+
+  // Column headers
+  const headers=state.players.map((p,i)=>{
+    const s=p.score;
+    const col=s>=100?'var(--red)':s>=70?'var(--orange)':'var(--green)';
+    return`<th>
+      ${avatar(p.name,i,'sm')}
+      <div style="font-size:9px;margin-top:3px;color:var(--text-dim);max-width:64px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(p.name)}</div>
+      <div class="th-pl-score" style="color:${col};">${s}</div>
+    </th>`;
+  }).join('');
+
+  return`
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+      <div style="font-family:var(--display);font-size:13px;letter-spacing:.18em;text-transform:uppercase;color:var(--gold-soft);">Tour ${state.rounds.length+1}</div>
+      <div style="font-size:13px;font-style:italic;color:var(--text-muted);">
+        <span class="ic ic-d" style="padding:2px 5px;font-size:10px;">D</span> ${esc(state.players[dealer].name)}
+      </div>
+    </div>
+    <div class="tableau-wrap">
+      <table class="stbl">
+        <thead><tr><th class="th-round">#</th>${headers}</tr></thead>
+        <tbody>
+          ${pastRows.join('')}
+          <tr class="row-current">
+            <td class="td-round" style="color:var(--gold);">→</td>
+            ${currentCells}
+          </tr>
+        </tbody>
+        <tfoot>
+          <tr class="row-total">
+            <td class="td-round" style="font-size:9px;color:var(--text-muted);">TOT</td>
+            ${state.players.map((p,i)=>{
+              const col=p.score>=100?'var(--red)':p.score>=70?'var(--orange)':'var(--green)';
+              return`<td style="color:${col};">${p.eliminated?'<span style="color:var(--red);font-size:11px;">Sorti</span>':p.score}</td>`;
+            }).join('')}
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+    <div style="font-size:11px;color:var(--text-muted);margin:8px 0 12px;display:flex;gap:10px;flex-wrap:wrap;">
+      <span><span class="ic ic-d">D</span> Distributeur</span>
+      <span><span class="ic ic-e">E</span> Étalé</span>
+      <span><span class="ic ic-51">51</span> Pénalité</span>
+    </div>
+    ${canValidate
+      ?`<button class="btn btn-primary btn-block" data-act="validateRound">Valider le tour ${state.rounds.length+1} ›</button>`
+      :`<div style="text-align:center;font-style:italic;color:var(--text-muted);font-size:13px;">Clique sur une cellule <span style="color:var(--gold);">＋</span> pour saisir</div>`
+    }
+    <button class="btn btn-ghost btn-block" data-act="resetConfirm" style="margin-top:10px;">Nouvelle partie</button>`;
 }
 
 function render(){
@@ -810,7 +1070,12 @@ document.addEventListener('click',ev=>{
       showToast(`${state.players[state.dealerIdx].name} distribue en premier`);
       break;
     }
-    case 'setTab':state.tab=t.dataset.tab;render();break;
+    case 'setTab':closeSheet();state.tab=t.dataset.tab;render();break;
+    case 'tapCell':{
+      const i=+t.dataset.i;
+      if(!state.players[i].eliminated)openSheet(i);
+      break;
+    }
     case 'pickRank':state.draft.jokerRank=t.dataset.r;render();break;
     case 'pickSuit':state.draft.jokerSuit=t.dataset.s;render();break;
     case 'toggleStarted':state.draft.started=!state.draft.started;render();break;
@@ -896,7 +1161,7 @@ function handleValidateRound(){
         delta=e.malus||0;
       }
     }
-    return{idx:i,isWinner:i===winnerIdx,parole:!!e.parole,malus:e.malus||0,p51noFollow:!!e.p51noFollow,p51badLay:!!e.p51badLay,delta};
+    return{idx:i,isWinner:i===winnerIdx,parole:!!e.parole,malus:e.malus||0,p51noFollow:!!e.p51noFollow,p51badLay:!!e.p51badLay,etale:!!e.etale,delta};
   });
   entries.forEach(e=>{
     state.players[e.idx].score+=e.delta;
@@ -907,7 +1172,9 @@ function handleValidateRound(){
   if(state.players.filter(p=>!p.eliminated).length<=1){
     state.screen='finished';state.draft=emptyDraft();render();saveGame();return;
   }
-  state.draft=emptyDraft();state.tab='scores';render();
+  state.draft=emptyDraft();
+  if(state.tab!=='tableau')state.tab='scores';
+  render();
   const newlyOut=entries.filter(e=>{const p=state.players[e.idx];return p.eliminated&&p.score-e.delta<ELIMINATION});
   showToast(newlyOut.length?`${state.players[newlyOut[0].idx].name} éliminé !`:`Tour gagné par ${state.players[winnerIdx].name}`);
 }

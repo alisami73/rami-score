@@ -945,10 +945,14 @@ function viewTableau(){
     const hasPen=e.p51noFollow||e.p51badLay;
     const penPts=(e.p51noFollow?51:0)+(e.p51badLay?51:0);
     if(hasPen){
-      return`<td class="ci-tap" data-act="tapCell" data-i="${i}"><div class="ci ci-pen">${isD?'<span class="ic ic-d">D</span>':''}<span class="ci-total">+${penPts}</span>${e.etale?'<span class="ic ic-e">E</span>':''}</div></td>`;
+      const proj=p.score+penPts;
+      const willOut=proj>=ELIMINATION;
+      return`<td class="ci-tap" data-act="tapCell" data-i="${i}"><div class="ci ci-pen">${isD?'<span class="ic ic-d">D</span>':''}<span class="ci-total">${proj}</span><span class="ci-delta">+${penPts}</span>${willOut?'<span class="ic ic-51" style="font-size:8px;margin-top:1px;">SORTI</span>':''}${e.etale?'<span class="ic ic-e">E</span>':''}</div></td>`;
     }
     if(e.malus!==null&&e.malus!==undefined&&!isNaN(e.malus)){
-      return`<td class="ci-tap" data-act="tapCell" data-i="${i}"><div class="ci">${isD?'<span class="ic ic-d">D</span>':''}<span class="ci-total">${e.malus}</span>${e.etale?'<span class="ic ic-e">E</span>':''}</div></td>`;
+      const proj=p.score+e.malus;
+      const willOut=proj>=ELIMINATION;
+      return`<td class="ci-tap" data-act="tapCell" data-i="${i}"><div class="ci ${willOut?'ci-pen':''}">${isD?'<span class="ic ic-d">D</span>':''}<span class="ci-total">${proj}</span><span class="ci-delta">+${e.malus}</span>${willOut?'<span class="ic ic-51" style="font-size:8px;margin-top:1px;">SORTI</span>':''}${e.etale?'<span class="ic ic-e">E</span>':''}</div></td>`;
     }
     return`<td class="ci-tap" data-act="tapCell" data-i="${i}"><div class="ci">${isD?'<span class="ic ic-d" style="margin-bottom:2px;">D</span>':''}<span class="ci-empty">＋</span></div></td>`;
   }).join('');
@@ -993,8 +997,15 @@ function viewTableau(){
           <tr class="row-total">
             <td class="td-round" style="font-size:9px;color:var(--text-muted);">TOT</td>
             ${state.players.map((p,i)=>{
-              const col=p.score>=100?'var(--red)':p.score>=70?'var(--orange)':'var(--green)';
-              return`<td style="color:${col};">${p.eliminated?'<span style="color:var(--red);font-size:11px;">Sorti</span>':p.score}</td>`;
+              if(p.eliminated)return`<td><span style="color:var(--red);font-size:11px;">Sorti</span></td>`;
+              const e=d.perPlayer[i]||{};
+              let proj=p.score;
+              if(e.isWinner)proj=p.score;
+              else if(e.p51noFollow||e.p51badLay)proj=p.score+(e.p51noFollow?51:0)+(e.p51badLay?51:0);
+              else if(e.malus!==null&&e.malus!==undefined&&!isNaN(e.malus))proj=p.score+e.malus;
+              const willOut=proj>=ELIMINATION;
+              const col=proj>=100?'var(--red)':proj>=70?'var(--orange)':'var(--green)';
+              return`<td style="color:${col};font-weight:${proj!==p.score?'700':''};">${willOut?`<span style="color:var(--red);">${proj} ⚡</span>`:proj}</td>`;
             }).join('')}
           </tr>
         </tfoot>

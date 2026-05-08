@@ -574,8 +574,8 @@ function renderSheet(){
       </div>
     </div>`;
   el.querySelector('#sh-win').onclick=()=>{sheetData.isWinner=!sheetData.isWinner;if(sheetData.isWinner){sheetData.p51noFollow=false;sheetData.p51badLay=false;sheetData.malus=null}renderSheet()};
-  el.querySelector('#sh-nf')?.onclick=()=>{sheetData.p51noFollow=!sheetData.p51noFollow;sheetData.isWinner=false;renderSheet()};
-  el.querySelector('#sh-bl')?.onclick=()=>{sheetData.p51badLay=!sheetData.p51badLay;sheetData.isWinner=false;renderSheet()};
+  const shNf=el.querySelector('#sh-nf');if(shNf)shNf.onclick=()=>{sheetData.p51noFollow=!sheetData.p51noFollow;sheetData.isWinner=false;renderSheet()};
+  const shBl=el.querySelector('#sh-bl');if(shBl)shBl.onclick=()=>{sheetData.p51badLay=!sheetData.p51badLay;sheetData.isWinner=false;renderSheet()};
   el.querySelector('#sh-et').onclick=()=>{sheetData.etale=!sheetData.etale;renderSheet()};
   el.querySelector('#sh-malus')?.addEventListener('input',ev=>{const v=parseInt(ev.target.value,10);sheetData.malus=isNaN(v)?null:Math.max(0,v)});
   el.querySelector('#sh-cancel').onclick=closeSheet;

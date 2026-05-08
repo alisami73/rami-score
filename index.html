@@ -640,6 +640,8 @@ function viewEnter(){
       ${active.map(i=>{
         const e=d.perPlayer[i]||{};
         const isWin=!!e.isWinner,isPar=!!e.parole;
+        const hasPenalty=e.p51noFollow||e.p51badLay;
+        const penaltyTotal=(e.p51noFollow?51:0)+(e.p51badLay?51:0);
         const cls='player-entry'+(isWin?' is-winner':'')+(isPar?' is-parole':'');
         return`<div class="${cls}">
           <div class="player-entry-head">
@@ -650,9 +652,11 @@ function viewEnter(){
             </div>
             <button class="winner-pick ${isWin?'on':''}" data-act="pickWinner" data-i="${i}" ${isPar?'disabled style="opacity:.4"':''}>★</button>
           </div>
-          ${!isWin
-            ?`<div class="row"><div class="malus-input"><input type="number" inputmode="numeric" min="0" max="300" placeholder="Points de cartes restantes" value="${e.malus??''}" data-act="setMalus" data-i="${i}" ${isPar?'disabled':''}></div></div>`
-            :`<div style="font-style:italic;color:var(--gold-soft);font-size:14px;">★ Gagnant — 0 pt de malus</div>`
+          ${isWin
+            ?`<div style="font-style:italic;color:var(--gold-soft);font-size:14px;">★ Gagnant — 0 pt de malus</div>`
+            :hasPenalty
+              ?`<div style="font-style:italic;color:var(--red);font-size:15px;">Pénalité : +${penaltyTotal} pts</div>`
+              :!isPar?`<div class="row"><div class="malus-input"><input type="number" inputmode="numeric" min="0" max="300" placeholder="Points de cartes restantes" value="${e.malus??''}" data-act="setMalus" data-i="${i}"></div></div>`:''
           }
           <div class="penalty-toggle">
             <button class="chip chip-parole ${isPar?'on':''}" data-act="toggleParole" data-i="${i}">${isPar?'✓ ':''}Parole</button>
@@ -879,15 +883,19 @@ function handleValidateRound(){
   for(const i of active){
     if(i===winnerIdx)continue;
     const e=d.perPlayer[i]||{};
-    if(e.parole)continue;
-    if(e.malus==null||isNaN(e.malus)){showToast(`Saisis les malus de ${state.players[i].name}`);return}
+    if(e.parole||e.p51noFollow||e.p51badLay)continue;
+    if(e.malus==null||isNaN(e.malus)){showToast(`Saisis les points de ${state.players[i].name}`);return}
   }
   const entries=active.map(i=>{
     const e=d.perPlayer[i]||{};
     let delta=0;
-    if(!e.parole&&i!==winnerIdx)delta=e.malus||0;
-    if(e.p51noFollow)delta+=51;
-    if(e.p51badLay)delta+=51;
+    if(!e.parole&&i!==winnerIdx){
+      if(e.p51noFollow||e.p51badLay){
+        delta=(e.p51noFollow?51:0)+(e.p51badLay?51:0);
+      }else{
+        delta=e.malus||0;
+      }
+    }
     return{idx:i,isWinner:i===winnerIdx,parole:!!e.parole,malus:e.malus||0,p51noFollow:!!e.p51noFollow,p51badLay:!!e.p51badLay,delta};
   });
   entries.forEach(e=>{

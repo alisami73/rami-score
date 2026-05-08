@@ -519,9 +519,6 @@ const SUIT_BY_ID=Object.fromEntries(SUITS.map(s=>[s.id,s]));
 const RANK_BY_ID=Object.fromEntries(RANKS.map(r=>[r.id,r]));
 const ELIMINATION=151;
 const CARD_MALUS_MAX=51;
-const ELIMINATION_SOUND_SRC='assets/audio/joueur-sorti.m4a';
-const NO_FOLLOW_SOUND_SRC='assets/audio/sans-suivi-51.m4a';
-const BAD_LAY_SOUND_SRC='assets/audio/etalage-incomplet.m4a';
 const STORAGE_KEY='rami-v2';
 const PLAYER_COLORS=['#e84545','#4ade80','#c9a227','#7888a8'];
 const PLAYER_TEXT =['#f4ecd8','#1a0a2e','#1a0a2e','#f4ecd8'];
@@ -546,6 +543,9 @@ let toastTimer=null;
 let eliminationAudio=null;
 let noFollowAudio=null;
 let badLayAudio=null;
+let snippetAudios=[];
+let lastSnippetIndex=-1;
+let audioPrimed=false;
 
 function freshSetup(){
   return{
@@ -669,50 +669,102 @@ function showToast(text,ms=2400){
   document.body.appendChild(t);
   toastTimer=setTimeout(()=>t.remove(),ms);
 }
+function resolveAppUrl(path){
+  const href=window.location.href;
+  const pathname=window.location.pathname;
+  const hasHtmlFile=/\/[^/]+\.html?$/i.test(pathname);
+  const baseHref=hasHtmlFile||href.endsWith('/')?href:`${href}/`;
+  return new URL(path,baseHref).href;
+}
+const ELIMINATION_SOUND_SRC=resolveAppUrl('assets/audio/joueur-sorti.m4a');
+const NO_FOLLOW_SOUND_SRC=resolveAppUrl('assets/audio/sans-suivi-51.m4a');
+const BAD_LAY_SOUND_SRC=resolveAppUrl('assets/audio/etalage-incomplet.m4a');
+const EXTRA_SNIPPET_SRCS=[
+  resolveAppUrl('assets/audio/snippet-8.m4a'),
+  resolveAppUrl('assets/audio/snippet-9.m4a'),
+];
+function buildAudio(src){
+  const audio=new Audio(src);
+  audio.preload='auto';
+  audio.playsInline=true;
+  audio.load();
+  return audio;
+}
+function playAudioClip(audio,label){
+  try{
+    audio.pause();
+    audio.currentTime=0;
+    const playing=audio.play();
+    if(playing&&typeof playing.catch==='function')playing.catch(err=>console.warn(`${label} audio failed`,err));
+  }catch(e){}
+}
+function ensureAudioBank(){
+  if(!eliminationAudio)eliminationAudio=buildAudio(ELIMINATION_SOUND_SRC);
+  if(!noFollowAudio)noFollowAudio=buildAudio(NO_FOLLOW_SOUND_SRC);
+  if(!badLayAudio)badLayAudio=buildAudio(BAD_LAY_SOUND_SRC);
+  if(!snippetAudios.length)snippetAudios=[eliminationAudio,noFollowAudio,badLayAudio,...EXTRA_SNIPPET_SRCS.map(buildAudio)];
+}
+function allSnippetAudios(){
+  ensureAudioBank();
+  return snippetAudios;
+}
+function primeAudioBank(){
+  if(audioPrimed)return;
+  audioPrimed=true;
+  const bank=[...new Set(allSnippetAudios())];
+  bank.forEach(audio=>{
+    try{
+      audio.muted=true;
+      const playing=audio.play();
+      if(playing&&typeof playing.then==='function'){
+        playing.then(()=>{
+          audio.pause();
+          audio.currentTime=0;
+          audio.muted=false;
+        }).catch(()=>{
+          audio.muted=false;
+          audio.load();
+        });
+      }else{
+        audio.muted=false;
+        audio.load();
+      }
+    }catch(e){
+      audio.muted=false;
+      audio.load();
+    }
+  });
+}
 function getEliminationAudio(){
-  if(!eliminationAudio){
-    eliminationAudio=new Audio(ELIMINATION_SOUND_SRC);
-    eliminationAudio.preload='auto';
-  }
+  ensureAudioBank();
   return eliminationAudio;
 }
 function playEliminationSound(){
-  try{
-    const audio=getEliminationAudio();
-    audio.currentTime=0;
-    const playing=audio.play();
-    if(playing&&typeof playing.catch==='function')playing.catch(()=>{});
-  }catch(e){}
+  playAudioClip(getEliminationAudio(),'Elimination');
 }
 function getNoFollowAudio(){
-  if(!noFollowAudio){
-    noFollowAudio=new Audio(NO_FOLLOW_SOUND_SRC);
-    noFollowAudio.preload='auto';
-  }
+  ensureAudioBank();
   return noFollowAudio;
 }
 function playNoFollowSound(){
-  try{
-    const audio=getNoFollowAudio();
-    audio.currentTime=0;
-    const playing=audio.play();
-    if(playing&&typeof playing.catch==='function')playing.catch(()=>{});
-  }catch(e){}
+  playAudioClip(getNoFollowAudio(),'No-follow');
 }
 function getBadLayAudio(){
-  if(!badLayAudio){
-    badLayAudio=new Audio(BAD_LAY_SOUND_SRC);
-    badLayAudio.preload='auto';
-  }
+  ensureAudioBank();
   return badLayAudio;
 }
 function playBadLaySound(){
-  try{
-    const audio=getBadLayAudio();
-    audio.currentTime=0;
-    const playing=audio.play();
-    if(playing&&typeof playing.catch==='function')playing.catch(()=>{});
-  }catch(e){}
+  playAudioClip(getBadLayAudio(),'Bad-lay');
+}
+function playRandomSnippet(){
+  const pool=allSnippetAudios();
+  if(!pool.length)return;
+  let idx=Math.floor(Math.random()*pool.length);
+  if(pool.length>1&&idx===lastSnippetIndex){
+    idx=(idx+1+Math.floor(Math.random()*(pool.length-1)))%pool.length;
+  }
+  lastSnippetIndex=idx;
+  playAudioClip(pool[idx],'Random snippet');
 }
 
 // ---- Tableau sheet ----
@@ -845,6 +897,11 @@ function renderSheet(){
   const p=state.players[sheetPlayerIdx];
   const hasPen=sheetData.p51noFollow||sheetData.p51badLay;
   const penPts=(sheetData.p51noFollow?51:0)+(sheetData.p51badLay?51:0);
+  const otherActive=activeIndices().filter(j=>j!==sheetPlayerIdx);
+  const anyOtherMalus=otherActive.some(j=>{const e=state.draft.perPlayer[j]||{};return!e.isWinner&&!e.p51noFollow&&!e.p51badLay&&!e.parole&&e.malus!==null&&e.malus!==undefined&&!isNaN(e.malus);});
+  const anyOtherBadLay=otherActive.some(j=>state.draft.perPlayer[j]?.p51badLay);
+  const badLayDisabled=sheetData.p51noFollow||anyOtherMalus||anyOtherBadLay;
+  const nfDisabled=sheetData.p51badLay;
   const el=document.createElement('div');
   el.id='sheet-overlay';el.className='sheet-overlay';
   el.innerHTML=`
@@ -864,8 +921,8 @@ function renderSheet(){
             ${hasCardCounts(sheetData.cardCounts)?`<div class="calc-note" style="margin-top:0;margin-bottom:10px;">${entryCardSummary(sheetData)}</div>`:''}`
         }
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
-          <button class="chip ${sheetData.p51noFollow?'on':''}" id="sh-nf"><span class="plus">+51</span> sans suivi</button>
-          <button class="chip ${sheetData.p51badLay?'on':''}" id="sh-bl"><span class="plus">+51</span> étalage incomplet</button>
+          <button class="chip ${sheetData.p51noFollow?'on':''}" id="sh-nf" ${nfDisabled?'disabled style="opacity:.4"':''}><span class="plus">+51</span> sans suivi</button>
+          <button class="chip ${sheetData.p51badLay?'on':''}" id="sh-bl" ${badLayDisabled?'disabled style="opacity:.4"':''}><span class="plus">+51</span> étalage incomplet</button>
         </div>
       `:''}
       <button class="win-btn ${sheetData.etale?'on':''}" id="sh-et" style="margin-bottom:14px;${sheetData.etale?'background:linear-gradient(180deg,#4ade80,#16a34a);color:#1a0a2e;border-color:var(--green);font-weight:700;':'background:rgba(74,222,128,.08);border-color:rgba(74,222,128,.3);color:var(--green);'}">⤵ &nbsp; Étalage</button>
@@ -875,8 +932,8 @@ function renderSheet(){
       </div>
     </div>`;
   el.querySelector('#sh-win').onclick=()=>{sheetData.isWinner=!sheetData.isWinner;if(sheetData.isWinner){sheetData.p51noFollow=false;sheetData.p51badLay=false;sheetData.malus=null;sheetData.cardCounts=emptyCardCounts()}renderSheet()};
-  const shNf=el.querySelector('#sh-nf');if(shNf)shNf.onclick=()=>{sheetData.p51noFollow=!sheetData.p51noFollow;sheetData.isWinner=false;renderSheet()};
-  const shBl=el.querySelector('#sh-bl');if(shBl)shBl.onclick=()=>{sheetData.p51badLay=!sheetData.p51badLay;sheetData.isWinner=false;renderSheet()};
+  const shNf=el.querySelector('#sh-nf');if(shNf)shNf.onclick=()=>{if(!nfDisabled){sheetData.p51noFollow=!sheetData.p51noFollow;if(sheetData.p51noFollow)sheetData.p51badLay=false;sheetData.isWinner=false;renderSheet()}};
+  const shBl=el.querySelector('#sh-bl');if(shBl)shBl.onclick=()=>{if(!badLayDisabled){sheetData.p51badLay=!sheetData.p51badLay;if(sheetData.p51badLay)sheetData.p51noFollow=false;sheetData.isWinner=false;renderSheet()}};
   el.querySelector('#sh-et').onclick=()=>{sheetData.etale=!sheetData.etale;renderSheet()};
   el.querySelector('#sh-malus')?.addEventListener('input',ev=>{
     const v=parseInt(ev.target.value,10);
@@ -1058,6 +1115,7 @@ function viewEnter(){
   const winnerIdx=active.find(i=>d.perPlayer[i]?.isWinner);
   const etBadLayIdx=active.find(i=>d.perPlayer[i]?.p51badLay);
   const isEtIncompletDraft=etBadLayIdx!=null&&winnerIdx==null;
+  const anyMalusEntered=active.some(i=>{const e=d.perPlayer[i]||{};return!e.isWinner&&!e.p51noFollow&&!e.p51badLay&&!e.parole&&e.malus!==null&&e.malus!==undefined&&!isNaN(e.malus);});
   const hasJoker=d.jokerRank&&d.jokerSuit;
 
   return`
@@ -1127,8 +1185,8 @@ function viewEnter(){
           }
           <div class="penalty-toggle">
             <button class="chip chip-parole ${isPar?'on':''}" data-act="toggleParole" data-i="${i}">${isPar?'✓ ':''}Parole</button>
-            <button class="chip ${e.p51noFollow?'on':''}" data-act="toggleP51nf" data-i="${i}" ${isPar?'disabled style="opacity:.4"':''}><span class="plus">+51</span> sans suivi</button>
-            <button class="chip ${e.p51badLay?'on':''}" data-act="toggleP51be" data-i="${i}" ${isPar?'disabled style="opacity:.4"':''}><span class="plus">+51</span> étalage erroné</button>
+            <button class="chip ${e.p51noFollow?'on':''}" data-act="toggleP51nf" data-i="${i}" ${isPar||e.p51badLay?'disabled style="opacity:.4"':''}><span class="plus">+51</span> sans suivi</button>
+            <button class="chip ${e.p51badLay?'on':''}" data-act="toggleP51be" data-i="${i}" ${isPar||e.p51noFollow||anyMalusEntered||(etBadLayIdx!=null&&etBadLayIdx!==i)?'disabled style="opacity:.4"':''}><span class="plus">+51</span> étalage incomplet</button>
           </div>
         </div>`;
       }).join('')}
@@ -1538,6 +1596,7 @@ document.addEventListener('click',ev=>{
       state.playForCoffee=t.dataset.v==='1';
       state.screen='game';state.tab='enter';
       render();
+      playRandomSnippet();
       showToast(state.playForCoffee?'☕ On joue pour la consommation !':'Partie sans consommation');
       break;
     }
@@ -1574,13 +1633,13 @@ document.addEventListener('click',ev=>{
     case 'toggleP51nf':{
       const i=+t.dataset.i;
       const e=state.draft.perPlayer[i]=state.draft.perPlayer[i]||{};
-      if(!e.parole){e.p51noFollow=!e.p51noFollow;render()}
+      if(!e.parole&&!e.p51badLay){e.p51noFollow=!e.p51noFollow;render()}
       break;
     }
     case 'toggleP51be':{
       const i=+t.dataset.i;
       const e=state.draft.perPlayer[i]=state.draft.perPlayer[i]||{};
-      if(!e.parole){e.p51badLay=!e.p51badLay;render()}
+      if(!e.parole&&!e.p51noFollow){e.p51badLay=!e.p51badLay;render()}
       break;
     }
     case 'undoRound':if(confirm('Annuler le dernier tour et corriger les scores ?'))undoLastRound();break;
@@ -1615,6 +1674,9 @@ document.addEventListener('change',ev=>{
   }
 });
 
+document.addEventListener('pointerdown',primeAudioBank,{once:true});
+document.addEventListener('keydown',primeAudioBank,{once:true});
+
 document.addEventListener('input',ev=>{
   const t=ev.target.closest('[data-act]');
   if(!t)return;
@@ -1636,6 +1698,7 @@ function handleRedistribute(){
   state.rounds.push({parole:true,dealerIdx:state.dealerIdx,started:wasStarted,dealerAdvanced:wasStarted,jokerRank:state.draft.jokerRank,jokerSuit:state.draft.jokerSuit,entries:[]});
   if(wasStarted)state.dealerIdx=nextActiveAfter(state.dealerIdx);
   state.draft=emptyDraft();render();
+  playRandomSnippet();
   showToast(wasStarted?'Redistribution · distributeur avancé':'Redistribution · même distributeur');
 }
 
@@ -1695,6 +1758,7 @@ function handleValidateRound(){
   state.draft=emptyDraft();
   if(state.tab!=='tableau')state.tab='scores';
   render();
+  if(!badLayTriggered&&!noFollowTriggered&&!newlyOut.length)playRandomSnippet();
   const toastMsg=newlyOut.length?`${state.players[newlyOut[0].idx].name} éliminé !`:isEtIncomplet?`Étalage incomplet — ${state.players[badLayIdx].name} +51`:winnerIdx!=null?`Tour gagné par ${state.players[winnerIdx].name}`:'Tour validé';
   showToast(toastMsg);
 }

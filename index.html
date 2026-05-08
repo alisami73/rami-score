@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#1a0a2e">
+<title>Rami — Compteur de Scores</title>
+<style>
+  :root {
+    --bg: #1a0a2e;
+    --bg-deeper: #0f0620;
+    --surface: #2d1555;
+    --surface-2: #3a1d6b;
+    --surface-3: #4a2685;
+    --line: #5a3496;
+    --line-soft: #3a1d6b;
+    --gold: #c9a227;
+    --gold-soft: #e6c66b;
+    --gold-deep: #8a6e15;
+    --gold-glow: rgba(201,162,39,0.35);
+    --red: #e84545;
+    --blue-gray: #7888a8;
+    --blue-gray-2: #9aacc8;
+    --green: #4ade80;
+    --orange: #fb923c;
+    --text: #f4ecd8;
+    --text-dim: #c5b4e0;
+    --text-muted: #8a76b8;
+    --serif: "Cormorant Garamond","Cormorant",Georgia,"Times New Roman",serif;
+    --display: "Playfair Display","Cormorant Garamond",Georgia,serif;
+    --safe-top: env(safe-area-inset-top,0px);
+    --safe-bottom: env(safe-area-inset-bottom,0px);
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    background:
+      radial-gradient(ellipse 90% 60% at 50% -10%,rgba(90,52,150,.55),transparent 65%),
+      radial-gradient(ellipse 70% 50% at 50% 110%,rgba(201,162,39,.08),transparent 70%),
+      var(--bg);
+    background-attachment:fixed;
+    color:var(--text);
+    font-family:var(--serif);
+    font-size:17px;
+    line-height:1.4;
+    min-height:100dvh;
+    overscroll-behavior:none;
+    -webkit-font-smoothing:antialiased;
+  }
+  button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
+  input{font:inherit;color:inherit}
+  input[type="text"],input[type="number"]{
+    background:rgba(15,6,32,.6);
+    border:1px solid var(--line-soft);
+    border-radius:10px;
+    padding:12px 14px;
+    color:var(--text);
+    width:100%;
+    font-family:var(--serif);
+    font-size:18px;
+    outline:none;
+    transition:border-color .2s,box-shadow .2s;
+  }
+  input[type="text"]:focus,input[type="number"]:focus{border-color:var(--gold);box-shadow:0 0 0 3px var(--gold-glow)}
+  input[type="number"]{-moz-appearance:textfield}
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+
+  .app{max-width:520px;margin:0 auto;min-height:100dvh;display:flex;flex-direction:column;position:relative}
+  .header{
+    padding:calc(20px + var(--safe-top)) 24px 14px;
+    text-align:center;
+    border-bottom:1px solid var(--line-soft);
+    position:relative;
+  }
+  .header::after{
+    content:"";position:absolute;left:50%;bottom:-1px;
+    width:80px;height:2px;
+    background:linear-gradient(90deg,transparent,var(--gold),transparent);
+    transform:translateX(-50%);
+  }
+  .brand{font-family:var(--display);font-weight:600;font-size:32px;letter-spacing:.18em;color:var(--gold);text-transform:uppercase;text-shadow:0 1px 0 #000,0 0 24px var(--gold-glow)}
+  .brand-sub{font-style:italic;color:var(--text-muted);font-size:13px;letter-spacing:.18em;text-transform:uppercase;margin-top:4px}
+  .content{flex:1;padding:20px 18px 120px;overflow-y:auto}
+  .content.no-tabs{padding-bottom:calc(40px + var(--safe-bottom))}
+
+  /* Panels */
+  .panel{
+    background:linear-gradient(180deg,var(--surface) 0%,#25104a 100%);
+    border:1px solid var(--line-soft);
+    border-radius:16px;
+    padding:18px;
+    margin-bottom:16px;
+    box-shadow:0 4px 20px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.04);
+  }
+  .panel-gold{
+    border-color:var(--gold-deep);
+    box-shadow:0 4px 20px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.06),0 0 0 1px rgba(201,162,39,.15);
+  }
+  .panel-title{
+    font-family:var(--display);font-size:13px;text-transform:uppercase;letter-spacing:.22em;
+    color:var(--gold-soft);margin-bottom:12px;display:flex;align-items:center;gap:10px;
+  }
+  .panel-title::before,.panel-title::after{content:"";height:1px;background:linear-gradient(90deg,transparent,var(--gold-deep),transparent);flex:1}
+
+  /* Avatar */
+  .avatar{
+    border-radius:50%;display:inline-flex;align-items:center;justify-content:center;
+    font-family:var(--display);font-weight:700;flex:0 0 auto;
+    border:2px solid rgba(255,255,255,.15);
+    box-shadow:0 2px 8px rgba(0,0,0,.4);
+    text-transform:uppercase;letter-spacing:.04em;
+  }
+  .av-lg{width:40px;height:40px;font-size:14px}
+  .av-md{width:34px;height:34px;font-size:12px}
+  .av-sm{width:28px;height:28px;font-size:10px}
+
+  /* Buttons */
+  .btn{
+    display:inline-flex;align-items:center;justify-content:center;gap:8px;
+    padding:14px 22px;border-radius:12px;
+    font-family:var(--display);font-size:15px;letter-spacing:.16em;text-transform:uppercase;font-weight:500;
+    transition:transform .1s,box-shadow .2s,background .2s;border:1px solid transparent;user-select:none;
+  }
+  .btn-primary{
+    background:linear-gradient(180deg,var(--gold-soft) 0%,var(--gold) 60%,var(--gold-deep) 100%);
+    color:#1a0a2e;box-shadow:0 4px 14px rgba(201,162,39,.3),inset 0 1px 0 rgba(255,255,255,.4);font-weight:600;
+  }
+  .btn-primary:active{transform:translateY(1px)}
+  .btn-primary:disabled{background:linear-gradient(180deg,#4a3a1a,#2a1f0e);color:var(--text-muted);box-shadow:none;cursor:not-allowed}
+  .btn-ghost{background:rgba(58,29,107,.5);color:var(--text-dim);border:1px solid var(--line-soft)}
+  .btn-ghost:active{background:rgba(74,38,133,.6)}
+  .btn-block{display:flex;width:100%}
+
+  /* Setup */
+  .setup-hero{text-align:center;padding:30px 0 20px}
+  .setup-hero .ornament{font-size:28px;color:var(--gold);letter-spacing:.4em;margin-bottom:18px}
+  .setup-hero h1{font-family:var(--display);font-size:28px;font-weight:500;color:var(--text);margin-bottom:6px}
+  .setup-hero p{font-style:italic;color:var(--text-muted);font-size:15px}
+  .player-count{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:18px}
+  .count-pill{
+    padding:18px 0;border-radius:14px;background:rgba(45,21,85,.6);
+    border:1px solid var(--line-soft);font-family:var(--display);text-align:center;transition:all .2s;
+  }
+  .count-pill .num{font-size:30px;color:var(--gold-soft);display:block;line-height:1}
+  .count-pill .lbl{font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.18em;margin-top:6px}
+  .count-pill.active{background:linear-gradient(180deg,var(--surface-3),var(--surface));border-color:var(--gold);box-shadow:0 0 0 1px var(--gold-glow),0 4px 20px rgba(201,162,39,.2)}
+  .count-pill.active .num{color:var(--gold)}
+  .name-row{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+  .name-row .seat{
+    width:38px;height:38px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;flex:0 0 38px;
+    font-family:var(--display);font-size:16px;font-weight:600;
+  }
+
+  /* Card face */
+  .card-face{
+    width:78px;height:110px;border-radius:8px;
+    background:linear-gradient(160deg,#fdf6e3 0%,#f0e3c0 100%);
+    color:#2a1810;position:relative;
+    box-shadow:0 4px 16px rgba(0,0,0,.5),inset 0 0 0 1px rgba(255,255,255,.6),inset 0 0 0 2px rgba(0,0,0,.1);
+    font-family:var(--display);flex:0 0 auto;user-select:none;
+  }
+  .card-face.red{color:var(--red)}
+  .card-face.black{color:#1c2540}
+  .card-face.flip{
+    background:linear-gradient(135deg,#4a2685,#2d1555);color:var(--gold);
+    box-shadow:0 4px 16px rgba(0,0,0,.5),inset 0 0 0 2px var(--gold-deep);
+    display:flex;align-items:center;justify-content:center;font-size:40px;
+  }
+  .card-face .corner{position:absolute;font-size:18px;line-height:1;font-weight:600;text-align:center}
+  .card-face .corner.tl{top:8px;left:8px}
+  .card-face .corner.br{bottom:8px;right:8px;transform:rotate(180deg)}
+  .card-face .corner .v{display:block}
+  .card-face .corner .s{font-size:14px;display:block;margin-top:1px}
+  .card-face .center{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:38px}
+  .card-face.small{width:56px;height:80px}
+  .card-face.small .corner{font-size:13px}
+  .card-face.small .corner .s{font-size:11px}
+  .card-face.small .center{font-size:26px}
+
+  /* Joker stage */
+  .joker-stage{display:flex;align-items:center;justify-content:center;gap:18px;padding:12px 0 18px}
+  .joker-arrow{color:var(--gold);font-size:22px;opacity:.7}
+  .joker-label{text-align:center;margin-top:8px;font-size:12px;text-transform:uppercase;letter-spacing:.18em;color:var(--text-muted)}
+  .joker-label.is-gold{color:var(--gold-soft)}
+  .rank-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-bottom:14px}
+  .rank-btn{
+    aspect-ratio:1;border-radius:8px;background:rgba(15,6,32,.55);border:1px solid var(--line-soft);
+    font-family:var(--display);font-size:18px;color:var(--text-dim);transition:all .15s;
+  }
+  .rank-btn:active{transform:scale(.94)}
+  .rank-btn.active{background:linear-gradient(180deg,var(--gold-soft),var(--gold-deep));color:#1a0a2e;border-color:var(--gold);font-weight:600}
+  .suit-row{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+  .suit-btn{padding:14px 0;border-radius:10px;background:rgba(15,6,32,.55);border:1px solid var(--line-soft);font-size:26px;transition:all .15s}
+  .suit-btn.red{color:var(--red)}
+  .suit-btn.black{color:var(--blue-gray-2)}
+  .suit-btn.active.red{background:rgba(232,69,69,.15);border-color:var(--red);box-shadow:0 0 0 1px rgba(232,69,69,.3)}
+  .suit-btn.active.black{background:rgba(120,136,168,.15);border-color:var(--blue-gray-2);box-shadow:0 0 0 1px rgba(154,172,200,.3)}
+
+  /* Switch */
+  .switch-row{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--line-soft)}
+  .switch-row:last-child{border-bottom:none}
+  .switch-row .lbl{font-size:16px;color:var(--text)}
+  .switch-row .lbl em{display:block;font-style:italic;color:var(--text-muted);font-size:13px;margin-top:2px}
+  .switch{flex:0 0 52px;width:52px;height:30px;background:rgba(15,6,32,.6);border:1px solid var(--line-soft);border-radius:999px;position:relative;transition:all .2s}
+  .switch::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;background:var(--text-muted);border-radius:50%;transition:all .2s}
+  .switch.on{background:linear-gradient(180deg,var(--gold),var(--gold-deep));border-color:var(--gold)}
+  .switch.on::after{left:25px;background:#fdf6e3}
+
+  /* Player entry */
+  .player-entry{border:1px solid var(--line-soft);border-radius:14px;padding:14px;margin-bottom:10px;background:rgba(15,6,32,.35);transition:all .2s}
+  .player-entry.is-winner{border-color:var(--gold);background:linear-gradient(180deg,rgba(201,162,39,.12),rgba(15,6,32,.4));box-shadow:0 0 0 1px var(--gold-glow)}
+  .player-entry.is-parole{border-color:var(--blue-gray);background:rgba(120,136,168,.06)}
+  .player-entry-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+  .player-name{font-family:var(--display);font-size:19px;color:var(--text);display:flex;align-items:center;gap:8px}
+  .winner-pick{
+    width:30px;height:30px;border-radius:50%;border:2px solid var(--line);
+    background:rgba(15,6,32,.6);display:flex;align-items:center;justify-content:center;
+    color:var(--gold);font-size:14px;flex:0 0 30px;transition:all .2s;
+  }
+  .winner-pick.on{background:linear-gradient(180deg,var(--gold-soft),var(--gold-deep));border-color:var(--gold);color:#1a0a2e;box-shadow:0 0 12px var(--gold-glow)}
+  .player-entry .row{display:flex;gap:10px;align-items:center}
+  .malus-input{flex:1}
+  .malus-input input{padding:10px 12px;font-size:17px}
+  .penalty-toggle{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+  .chip{
+    padding:8px 12px;border-radius:999px;background:rgba(15,6,32,.55);border:1px solid var(--line-soft);
+    font-size:13px;color:var(--text-muted);display:inline-flex;align-items:center;gap:6px;transition:all .15s;
+  }
+  .chip.on{background:rgba(232,69,69,.15);border-color:var(--red);color:var(--red)}
+  .chip .plus{font-family:var(--display);font-weight:600}
+  .chip-parole.on{background:rgba(120,136,168,.18);border-color:var(--blue-gray-2);color:var(--blue-gray-2)}
+
+  /* Score cards */
+  .score-card{
+    background:linear-gradient(180deg,var(--surface) 0%,#25104a 100%);
+    border:1px solid var(--line-soft);border-radius:14px;padding:14px 16px;margin-bottom:12px;
+    position:relative;overflow:hidden;transition:opacity .3s;
+  }
+  .score-card.dealer{border-color:var(--gold-deep);box-shadow:0 0 0 1px rgba(201,162,39,.18)}
+  .score-card.eliminated{opacity:.55;background:linear-gradient(180deg,rgba(45,21,85,.5) 0%,rgba(15,6,32,.5) 100%)}
+  .score-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+  .score-name{display:flex;align-items:center;gap:10px;font-family:var(--display);font-size:20px;color:var(--text)}
+  .score-pts{font-family:var(--display);font-size:26px;font-weight:600;color:var(--gold-soft);letter-spacing:.04em;font-variant-numeric:tabular-nums}
+  .score-pts.danger{color:var(--red)}
+  .score-pts.warn{color:var(--orange)}
+  .score-pts.safe{color:var(--green)}
+  .progress{height:7px;background:rgba(15,6,32,.7);border-radius:999px;overflow:hidden;border:1px solid var(--line-soft)}
+  .progress-bar{height:100%;border-radius:999px;transition:width .6s cubic-bezier(.2,.8,.2,1)}
+  .score-meta{display:flex;justify-content:space-between;font-size:12px;color:var(--text-muted);margin-top:8px;text-transform:uppercase;letter-spacing:.12em}
+
+  /* Badges */
+  .badge{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:999px;font-size:11px;font-family:var(--display);text-transform:uppercase;letter-spacing:.14em;font-weight:600}
+  .badge-dealer{background:linear-gradient(180deg,var(--gold-soft),var(--gold-deep));color:#1a0a2e;box-shadow:0 0 12px var(--gold-glow);animation:dealerPulse 2.4s ease-in-out infinite}
+  .badge-out{background:rgba(232,69,69,.18);color:var(--red);border:1px solid rgba(232,69,69,.4)}
+  @keyframes dealerPulse{0%,100%{box-shadow:0 0 8px var(--gold-glow)}50%{box-shadow:0 0 18px var(--gold-glow),0 0 28px var(--gold-glow)}}
+
+  /* History */
+  .round-card{background:linear-gradient(180deg,var(--surface) 0%,#25104a 100%);border:1px solid var(--line-soft);border-radius:14px;padding:14px 16px;margin-bottom:12px}
+  .round-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px;padding-bottom:8px;border-bottom:1px dashed var(--line-soft)}
+  .round-num{font-family:var(--display);font-size:13px;color:var(--gold-soft);text-transform:uppercase;letter-spacing:.2em}
+  .round-dealer{font-style:italic;font-size:13px;color:var(--text-muted)}
+  .round-joker{display:flex;align-items:center;gap:10px;margin-bottom:10px;padding:8px 0}
+  .round-joker .mini-tag{font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.15em;margin-right:4px}
+  .round-line{display:flex;justify-content:space-between;align-items:center;padding:6px 0;font-size:15px;gap:8px}
+  .round-line .nm{color:var(--text-dim);display:flex;align-items:center;gap:6px;flex:1}
+  .round-line .nm.win{color:var(--gold-soft);font-weight:600}
+  .round-line .tags{color:var(--red);font-size:12px;font-style:italic}
+  .round-line .pt{font-family:var(--display);font-variant-numeric:tabular-nums;flex:0 0 auto}
+  .round-parole{text-align:center;font-style:italic;color:var(--blue-gray-2);padding:6px 0;font-size:14px}
+  .empty-history{text-align:center;padding:50px 20px;color:var(--text-muted);font-style:italic}
+  .empty-history .ornament{font-size:30px;color:var(--gold-deep);margin-bottom:12px}
+
+  /* Tabs */
+  .tabs{
+    position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:520px;
+    background:linear-gradient(180deg,rgba(26,10,46,.85) 0%,var(--bg-deeper) 100%);
+    backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+    border-top:1px solid var(--line-soft);padding-bottom:var(--safe-bottom);z-index:50;
+  }
+  .tabs::before{content:"";position:absolute;top:0;left:50%;transform:translateX(-50%);width:100px;height:1px;background:linear-gradient(90deg,transparent,var(--gold),transparent)}
+  .tabs-inner{display:grid;grid-template-columns:repeat(3,1fr)}
+  .tab{padding:12px 0 14px;text-align:center;color:var(--text-muted);transition:color .2s;position:relative}
+  .tab .ico{display:block;font-size:22px;margin-bottom:4px;line-height:1}
+  .tab .lbl{font-family:var(--display);font-size:11px;letter-spacing:.2em;text-transform:uppercase}
+  .tab.active{color:var(--gold-soft)}
+  .tab.active .ico{color:var(--gold)}
+  .tab.active::before{content:"";position:absolute;top:0;left:50%;transform:translateX(-50%);width:28px;height:2px;background:var(--gold);border-radius:2px}
+
+  /* Game over */
+  .gameover{text-align:center;padding:30px 12px 20px}
+  .gameover .crown{font-size:56px;margin-bottom:10px;filter:drop-shadow(0 0 16px var(--gold-glow))}
+  .gameover h2{font-family:var(--display);font-size:32px;color:var(--gold);letter-spacing:.16em;text-transform:uppercase;text-shadow:0 0 24px var(--gold-glow)}
+  .gameover .winner-name{font-family:var(--display);font-size:28px;color:var(--text);margin:4px 0;font-style:italic}
+  .gameover .winner-sub{color:var(--text-muted);font-style:italic;font-size:14px}
+  .ranking-row{display:flex;align-items:center;gap:12px;padding:13px 16px;background:var(--surface);border:1px solid var(--line-soft);border-radius:12px;margin-bottom:10px}
+  .ranking-row.gold{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold-glow)}
+  .ranking-row .pos{font-family:var(--display);font-size:26px;color:var(--gold-soft);width:34px;text-align:center}
+  .ranking-row.gold .pos{color:var(--gold)}
+  .ranking-row .nm{flex:1;font-family:var(--display);font-size:18px}
+  .ranking-row .pt{font-family:var(--display);font-variant-numeric:tabular-nums;color:var(--text-dim);font-size:15px}
+
+  /* Helpers */
+  .row-flex{display:flex;gap:10px}
+  .row-flex>*{flex:1}
+  .mt-16{margin-top:16px}
+  .toast{
+    position:fixed;top:calc(20px + var(--safe-top));left:50%;transform:translateX(-50%);
+    background:linear-gradient(180deg,var(--surface-3),var(--surface));border:1px solid var(--gold);
+    color:var(--gold-soft);padding:12px 22px;border-radius:999px;
+    font-family:var(--display);font-size:14px;letter-spacing:.12em;text-transform:uppercase;
+    box-shadow:0 6px 22px rgba(0,0,0,.5),0 0 0 1px var(--gold-glow);z-index:100;
+    animation:toastIn .3s cubic-bezier(.2,.8,.2,1);white-space:nowrap;pointer-events:none;
+  }
+  @keyframes toastIn{from{transform:translate(-50%,-20px);opacity:0}to{transform:translate(-50%,0);opacity:1}}
+  .fade-in{animation:fadeIn .3s ease-out}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+</style>
+</head>
+<body>
+<div class="app" id="app"></div>
+<script>
+const SUITS=[
+  {id:'H',glyph:'♥',label:'Cœur',   color:'red',  opp:'S'},
+  {id:'D',glyph:'♦',label:'Carreau',color:'red',  opp:'C'},
+  {id:'S',glyph:'♠',label:'Pique',  color:'black',opp:'H'},
+  {id:'C',glyph:'♣',label:'Trèfle', color:'black',opp:'D'},
+];
+const RANKS=[
+  {id:'A', label:'A', pts:10},{id:'2', label:'2', pts:2},{id:'3', label:'3', pts:3},
+  {id:'4', label:'4', pts:4},{id:'5', label:'5', pts:5},{id:'6', label:'6', pts:6},
+  {id:'7', label:'7', pts:7},{id:'8', label:'8', pts:8},{id:'9', label:'9', pts:9},
+  {id:'10',label:'10',pts:10},{id:'V',label:'V', pts:10},{id:'D',label:'D', pts:10},
+  {id:'R', label:'R', pts:10},
+];
+const SUIT_BY_ID=Object.fromEntries(SUITS.map(s=>[s.id,s]));
+const RANK_BY_ID=Object.fromEntries(RANKS.map(r=>[r.id,r]));
+const ELIMINATION=151;
+const STORAGE_KEY='rami-v2';
+const PLAYER_COLORS=['#e84545','#4ade80','#c9a227','#7888a8'];
+const PLAYER_TEXT =['#f4ecd8','#1a0a2e','#1a0a2e','#f4ecd8'];
+
+let state=loadState()||freshSetup();
+let toastTimer=null;
+
+function freshSetup(){
+  return{
+    screen:'setup',nbPlayers:4,
+    players:[
+      {name:'',score:0,eliminated:false},
+      {name:'',score:0,eliminated:false},
+      {name:'',score:0,eliminated:false},
+      {name:'',score:0,eliminated:false},
+    ],
+    dealerIdx:0,rounds:[],tab:'enter',draft:emptyDraft(),
+  };
+}
+function emptyDraft(){return{jokerRank:null,jokerSuit:null,started:false,perPlayer:{}}}
+function saveState(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(state))}catch(e){}}
+function loadState(){
+  try{
+    const raw=localStorage.getItem(STORAGE_KEY);
+    if(!raw)return null;
+    const s=JSON.parse(raw);
+    if(!s.draft)s.draft=emptyDraft();
+    return s;
+  }catch(e){return null}
+}
+function resetGame(){localStorage.removeItem(STORAGE_KEY);state=freshSetup();render()}
+
+function activeIndices(){return state.players.map((p,i)=>({p,i})).filter(o=>!o.p.eliminated).map(o=>o.i)}
+function nextActiveAfter(idx){
+  const n=state.players.length;
+  for(let k=1;k<=n;k++){const j=(idx+k)%n;if(!state.players[j].eliminated)return j}
+  return idx;
+}
+function ensureDealerActive(){if(state.players[state.dealerIdx]?.eliminated)state.dealerIdx=nextActiveAfter(state.dealerIdx)}
+function pickRandomDealer(){const a=activeIndices();state.dealerIdx=a[Math.floor(Math.random()*a.length)]}
+
+function scoreTone(s){if(s>=100)return'danger';if(s>=70)return'warn';return'safe'}
+function barColor(s){if(s<70)return'var(--green)';if(s<100)return'var(--orange)';return'var(--red)'}
+
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+
+function avatar(name,idx,size){
+  const bg=PLAYER_COLORS[idx%4];
+  const fg=PLAYER_TEXT[idx%4];
+  const init=name?name.trim().slice(0,2).toUpperCase():String(idx+1);
+  return`<div class="avatar av-${size}" style="background:${bg};color:${fg};">${esc(init)}</div>`;
+}
+
+function cardHTML(rankId,suitId,small=false){
+  const sz=small?' small':'';
+  if(!rankId||!suitId)return`<div class="card-face flip${sz}">?</div>`;
+  const r=RANK_BY_ID[rankId],s=SUIT_BY_ID[suitId];
+  const cls=s.color==='red'?'red':'black';
+  return`<div class="card-face ${cls}${sz}"><div class="corner tl"><span class="v">${r.label}</span><span class="s">${s.glyph}</span></div><div class="center">${s.glyph}</div><div class="corner br"><span class="v">${r.label}</span><span class="s">${s.glyph}</span></div></div>`;
+}
+
+function showToast(text,ms=2400){
+  document.getElementById('toast')?.remove();
+  if(toastTimer)clearTimeout(toastTimer);
+  const t=document.createElement('div');
+  t.id='toast';t.className='toast';t.textContent=text;
+  document.body.appendChild(t);
+  toastTimer=setTimeout(()=>t.remove(),ms);
+}
+
+// ---- Views ----
+function viewSetup(){
+  const{nbPlayers,players}=state;
+  return`<div class="content no-tabs fade-in">
+    <div class="setup-hero">
+      <div class="ornament">✦ ❦ ✦</div>
+      <h1>Nouvelle Partie</h1>
+      <p>Salon privé · jusqu'à 151 points</p>
+    </div>
+    <div class="panel">
+      <div class="panel-title">Nombre de joueurs</div>
+      <div class="player-count">
+        ${[2,3,4].map(n=>`<button class="count-pill ${nbPlayers===n?'active':''}" data-act="setN" data-n="${n}"><span class="num">${n}</span><span class="lbl">Joueurs</span></button>`).join('')}
+      </div>
+      <div>
+        ${players.slice(0,nbPlayers).map((p,i)=>`
+          <div class="name-row">
+            <div class="seat" style="background:${PLAYER_COLORS[i]}22;border:2px solid ${PLAYER_COLORS[i]};color:${PLAYER_COLORS[i]};">${i+1}</div>
+            <input type="text" placeholder="Nom du joueur ${i+1}" value="${esc(p.name)}" data-act="setName" data-i="${i}" maxlength="20" autocomplete="off"/>
+          </div>`).join('')}
+      </div>
+    </div>
+    <div class="panel panel-gold">
+      <div class="panel-title">Règles</div>
+      <ul style="list-style:none;padding:0;font-size:15px;color:var(--text-dim);line-height:1.8;">
+        <li>◆ Élimination à <strong style="color:var(--red)">151 points</strong></li>
+        <li>◆ A / V / D / R = 10 pts · cartes numériques = valeur</li>
+        <li>◆ Pénalité <strong style="color:var(--gold-soft)">+51</strong> sans suivi ou étalage erroné</li>
+        <li>◆ Joker = même valeur, couleur opposée (♥↔♠ · ♦↔♣)</li>
+        <li>◆ Parole : même distrib. si non entamé, sinon distrib. avance</li>
+      </ul>
+    </div>
+    <button class="btn btn-primary btn-block" data-act="startGame">Commencer la partie ›</button>
+  </div>`;
+}
+
+function viewGame(){
+  const body=state.tab==='scores'?viewScores():state.tab==='history'?viewHistory():viewEnter();
+  return`<div class="content fade-in">${body}</div>${viewTabs()}`;
+}
+
+function viewTabs(){
+  const t=state.tab;
+  return`<nav class="tabs"><div class="tabs-inner">
+    <button class="tab ${t==='scores'?'active':''}" data-act="setTab" data-tab="scores"><span class="ico">♛</span><span class="lbl">Scores</span></button>
+    <button class="tab ${t==='enter'?'active':''}" data-act="setTab" data-tab="enter"><span class="ico">✎</span><span class="lbl">Saisir</span></button>
+    <button class="tab ${t==='history'?'active':''}" data-act="setTab" data-tab="history"><span class="ico">❦</span><span class="lbl">Historique</span></button>
+  </div></nav>`;
+}
+
+function viewScores(){
+  const dealer=state.dealerIdx;
+  const roundNum=state.rounds.length+1;
+  return`
+    <div class="panel panel-gold" style="text-align:center;">
+      <div style="font-family:var(--display);font-size:13px;letter-spacing:.22em;text-transform:uppercase;color:var(--gold-soft);">Tour ${roundNum}</div>
+      <div style="font-family:var(--display);font-size:20px;color:var(--text);margin-top:4px;">
+        Distributeur : <em style="color:var(--gold-soft);">${esc(state.players[dealer].name)||'—'}</em>
+      </div>
+    </div>
+    ${state.players.map((p,i)=>{
+      const pct=Math.min(100,Math.round((p.score/ELIMINATION)*100));
+      const remaining=Math.max(0,ELIMINATION-p.score);
+      return`<div class="score-card ${i===dealer?'dealer':''} ${p.eliminated?'eliminated':''}">
+        <div class="score-head">
+          <div class="score-name">
+            ${avatar(p.name,i,'lg')}
+            <span>${esc(p.name)}</span>
+            ${i===dealer&&!p.eliminated?`<span class="badge badge-dealer">Donne</span>`:''}
+            ${p.eliminated?`<span class="badge badge-out">Éliminé</span>`:''}
+          </div>
+          <div class="score-pts ${scoreTone(p.score)}">${p.score}</div>
+        </div>
+        <div class="progress"><div class="progress-bar" style="width:${pct}%;background:${barColor(p.score)};"></div></div>
+        <div class="score-meta">
+          <span>${p.eliminated?'Hors course':`${remaining} pts avant ${ELIMINATION}`}</span>
+          <span>${state.rounds.length} tour${state.rounds.length!==1?'s':''}</span>
+        </div>
+      </div>`;
+    }).join('')}
+    <div style="margin-top:8px;">
+      <button class="btn btn-ghost btn-block" data-act="resetConfirm">Nouvelle partie</button>
+    </div>`;
+}
+
+function viewEnter(){
+  ensureDealerActive();
+  const d=state.draft;
+  const dealer=state.dealerIdx;
+  const active=activeIndices();
+  const allParole=active.length>0&&active.every(i=>d.perPlayer[i]?.parole);
+  const winnerIdx=active.find(i=>d.perPlayer[i]?.isWinner);
+  const hasJoker=d.jokerRank&&d.jokerSuit;
+  const jSuit=hasJoker?SUIT_BY_ID[d.jokerSuit]:null;
+  const oppSuit=jSuit?SUIT_BY_ID[jSuit.opp]:null;
+
+  return`
+    <div class="panel panel-gold">
+      <div class="panel-title">Tour ${state.rounds.length+1}</div>
+      <div style="display:flex;align-items:center;justify-content:center;gap:12px;">
+        ${avatar(state.players[dealer].name,dealer,'lg')}
+        <div>
+          <div style="font-family:var(--display);font-size:24px;">${esc(state.players[dealer].name)}</div>
+          <div style="font-style:italic;color:var(--text-muted);font-size:12px;letter-spacing:.18em;text-transform:uppercase;">Distributeur</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">Joker du tour</div>
+      <div class="joker-stage">
+        <div>${cardHTML(d.jokerRank,d.jokerSuit)}<div class="joker-label">Carte retournée</div></div>
+        <div class="joker-arrow">➜</div>
+        <div>${hasJoker?cardHTML(d.jokerRank,oppSuit.id):cardHTML(null,null)}<div class="joker-label is-gold">Joker</div></div>
+      </div>
+      <div style="font-size:13px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.16em;margin-bottom:8px;">Valeur</div>
+      <div class="rank-grid">
+        ${RANKS.map(r=>`<button class="rank-btn ${d.jokerRank===r.id?'active':''}" data-act="pickRank" data-r="${r.id}">${r.label}</button>`).join('')}
+      </div>
+      <div style="font-size:13px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.16em;margin-bottom:8px;">Couleur</div>
+      <div class="suit-row">
+        ${SUITS.map(s=>`<button class="suit-btn ${s.color} ${d.jokerSuit===s.id?'active':''}" data-act="pickSuit" data-s="${s.id}">${s.glyph}</button>`).join('')}
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="switch-row">
+        <div class="lbl">Tour entamé<em>Au moins une carte tirée du talon</em></div>
+        <button class="switch ${d.started?'on':''}" data-act="toggleStarted"></button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">${allParole?'Tous parole':winnerIdx!=null?'Gagnant sélectionné':'Sélectionner le gagnant'}</div>
+      ${active.map(i=>{
+        const e=d.perPlayer[i]||{};
+        const isWin=!!e.isWinner,isPar=!!e.parole;
+        const cls='player-entry'+(isWin?' is-winner':'')+(isPar?' is-parole':'');
+        return`<div class="${cls}">
+          <div class="player-entry-head">
+            <div class="player-name">
+              ${avatar(state.players[i].name,i,'sm')}
+              ${esc(state.players[i].name)}
+              ${i===dealer?`<span class="badge badge-dealer" style="font-size:9px;">Donne</span>`:''}
+            </div>
+            <button class="winner-pick ${isWin?'on':''}" data-act="pickWinner" data-i="${i}" ${isPar?'disabled style="opacity:.4"':''}>★</button>
+          </div>
+          ${!isWin
+            ?`<div class="row"><div class="malus-input"><input type="number" inputmode="numeric" min="0" max="300" placeholder="Points de cartes restantes" value="${e.malus??''}" data-act="setMalus" data-i="${i}" ${isPar?'disabled':''}></div></div>`
+            :`<div style="font-style:italic;color:var(--gold-soft);font-size:14px;">★ Gagnant — 0 pt de malus</div>`
+          }
+          <div class="penalty-toggle">
+            <button class="chip chip-parole ${isPar?'on':''}" data-act="toggleParole" data-i="${i}">${isPar?'✓ ':''}Parole</button>
+            <button class="chip ${e.p51noFollow?'on':''}" data-act="toggleP51nf" data-i="${i}" ${isPar?'disabled style="opacity:.4"':''}><span class="plus">+51</span> sans suivi</button>
+            <button class="chip ${e.p51badLay?'on':''}" data-act="toggleP51be" data-i="${i}" ${isPar?'disabled style="opacity:.4"':''}><span class="plus">+51</span> étalage erroné</button>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>
+
+    ${allParole
+      ?`<div class="panel" style="text-align:center;border-color:var(--blue-gray);">
+          <div style="font-family:var(--display);font-size:18px;color:var(--blue-gray-2);letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px;">Tous parole</div>
+          <div style="font-style:italic;color:var(--text-muted);font-size:14px;">
+            ${d.started?'Tour entamé — le distributeur passe à gauche.':'Tour non entamé — même distributeur.'}
+          </div>
+          <button class="btn btn-primary btn-block mt-16" data-act="redistribute">↻ Redistribuer</button>
+        </div>`
+      :`<div class="row-flex">
+          <button class="btn btn-ghost" data-act="clearDraft">Effacer</button>
+          <button class="btn btn-primary" data-act="validateRound" ${winnerIdx==null?'disabled':''}>
+            ${winnerIdx==null?'Choisir un gagnant':'Valider le tour ›'}
+          </button>
+        </div>`
+    }`;
+}
+
+function viewHistory(){
+  if(!state.rounds.length)return`<div class="empty-history"><div class="ornament">❦</div><div style="font-family:var(--display);font-size:20px;color:var(--text-dim);margin-bottom:6px;">Aucun tour pour le moment</div><div>Saisis le premier tour dans l'onglet Saisir.</div></div>`;
+  return state.rounds.slice().reverse().map((r,ri)=>{
+    const num=state.rounds.length-ri;
+    const dealerName=state.players[r.dealerIdx]?.name||'—';
+    if(r.parole)return`<div class="round-card"><div class="round-head"><div class="round-num">Tour ${num} · Parole</div><div class="round-dealer">${esc(dealerName)}</div></div><div class="round-parole">↻ Redistribution ${r.dealerAdvanced?'· distributeur avancé':'· même distributeur'}</div></div>`;
+    const js=r.jokerSuit?SUIT_BY_ID[r.jokerSuit]:null;
+    const os=js?SUIT_BY_ID[js.opp]:null;
+    return`<div class="round-card">
+      <div class="round-head"><div class="round-num">Tour ${num}</div><div class="round-dealer">${esc(dealerName)} donne</div></div>
+      ${r.jokerRank&&r.jokerSuit?`<div class="round-joker"><span class="mini-tag">Joker :</span>${cardHTML(r.jokerRank,r.jokerSuit,true)}<span class="joker-arrow" style="font-size:16px;">➜</span>${cardHTML(r.jokerRank,os.id,true)}</div>`:''}
+      ${r.entries.map(e=>{
+        const tags=[];
+        if(e.p51noFollow)tags.push('+51 sans suivi');
+        if(e.p51badLay)tags.push('+51 étalage');
+        const p=state.players[e.idx];
+        return`<div class="round-line">
+          <div class="nm ${e.isWinner?'win':''}">
+            ${avatar(p.name,e.idx,'sm')}
+            <span>${esc(p.name)}${e.isWinner?' ★':''}</span>
+            ${tags.length?`<span class="tags">${tags.join(' · ')}</span>`:''}
+          </div>
+          <span class="pt" style="color:${e.delta===0?'var(--gold-soft)':e.delta>=51?'var(--red)':'var(--text-dim)'}">+${e.delta}</span>
+        </div>`;
+      }).join('')}
+    </div>`;
+  }).join('');
+}
+
+function viewFinished(){
+  const sorted=state.players.map((p,i)=>({...p,idx:i})).sort((a,b)=>{
+    if(a.eliminated!==b.eliminated)return a.eliminated?1:-1;
+    return a.score-b.score;
+  });
+  const winner=sorted[0];
+  return`<div class="content no-tabs fade-in">
+    <div class="gameover">
+      <div class="crown">♛</div>
+      <h2>Vainqueur</h2>
+      <div style="display:flex;align-items:center;justify-content:center;gap:14px;margin:16px 0 8px;">
+        ${avatar(winner.name,winner.idx,'lg')}
+        <div class="winner-name">${esc(winner.name)}</div>
+      </div>
+      <div class="winner-sub">${winner.score} points · partie remportée</div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">Classement final</div>
+      ${sorted.map((p,i)=>`
+        <div class="ranking-row ${i===0?'gold':''}">
+          <div class="pos">${i+1}</div>
+          ${avatar(p.name,p.idx,'md')}
+          <div class="nm">${esc(p.name)} ${p.eliminated?`<span class="badge badge-out" style="font-size:9px;">Éliminé</span>`:''}</div>
+          <div class="pt">${p.score} pts</div>
+        </div>`).join('')}
+    </div>
+    <div class="panel">
+      <div class="panel-title">Récapitulatif</div>
+      <div style="font-style:italic;color:var(--text-muted);text-align:center;font-size:14px;">${state.rounds.length} tour${state.rounds.length!==1?'s':''} joués · Le salon ferme ses portes…</div>
+    </div>
+    <button class="btn btn-primary btn-block" data-act="newGame">Nouvelle partie</button>
+  </div>`;
+}
+
+function render(){
+  const root=document.getElementById('app');
+  let body='';
+  if(state.screen==='setup'){
+    body=`<header class="header"><div class="brand">Rami</div><div class="brand-sub">Compteur de scores</div></header>${viewSetup()}`;
+  }else if(state.screen==='finished'){
+    body=`<header class="header"><div class="brand">Fin de partie</div><div class="brand-sub">${state.rounds.length} tour${state.rounds.length!==1?'s':''} joués</div></header>${viewFinished()}`;
+  }else{
+    body=`<header class="header"><div class="brand">Rami</div><div class="brand-sub">${state.nbPlayers} joueurs · ${state.rounds.length} tour${state.rounds.length!==1?'s':''}</div></header>${viewGame()}`;
+  }
+  root.innerHTML=body;
+  saveState();
+}
+
+// ---- Event handling ----
+document.addEventListener('click',ev=>{
+  const t=ev.target.closest('[data-act]');
+  if(!t)return;
+  switch(t.dataset.act){
+    case 'setN':{
+      const n=+t.dataset.n;
+      state.nbPlayers=n;
+      while(state.players.length<n)state.players.push({name:'',score:0,eliminated:false});
+      render();break;
+    }
+    case 'startGame':{
+      const names=state.players.slice(0,state.nbPlayers).map(p=>p.name.trim());
+      if(names.some(n=>!n)){showToast('Saisis tous les noms');return}
+      state.players=names.map(n=>({name:n,score:0,eliminated:false}));
+      state.rounds=[];state.draft=emptyDraft();state.screen='game';state.tab='enter';
+      pickRandomDealer();
+      render();
+      showToast(`${state.players[state.dealerIdx].name} distribue en premier`);
+      break;
+    }
+    case 'setTab':state.tab=t.dataset.tab;render();break;
+    case 'pickRank':state.draft.jokerRank=t.dataset.r;render();break;
+    case 'pickSuit':state.draft.jokerSuit=t.dataset.s;render();break;
+    case 'toggleStarted':state.draft.started=!state.draft.started;render();break;
+    case 'pickWinner':{
+      const i=+t.dataset.i;
+      if(state.draft.perPlayer[i]?.parole)return;
+      const cur=state.draft.perPlayer[i]?.isWinner;
+      activeIndices().forEach(j=>{if(state.draft.perPlayer[j])state.draft.perPlayer[j].isWinner=false});
+      if(!cur){
+        state.draft.perPlayer[i]=state.draft.perPlayer[i]||{};
+        state.draft.perPlayer[i].isWinner=true;
+        state.draft.perPlayer[i].malus=0;
+      }
+      render();break;
+    }
+    case 'toggleParole':{
+      const i=+t.dataset.i;
+      const e=state.draft.perPlayer[i]=state.draft.perPlayer[i]||{};
+      e.parole=!e.parole;
+      if(e.parole){e.isWinner=false;e.malus=0;e.p51noFollow=false;e.p51badLay=false}
+      render();break;
+    }
+    case 'toggleP51nf':{
+      const i=+t.dataset.i;
+      const e=state.draft.perPlayer[i]=state.draft.perPlayer[i]||{};
+      if(!e.parole){e.p51noFollow=!e.p51noFollow;render()}
+      break;
+    }
+    case 'toggleP51be':{
+      const i=+t.dataset.i;
+      const e=state.draft.perPlayer[i]=state.draft.perPlayer[i]||{};
+      if(!e.parole){e.p51badLay=!e.p51badLay;render()}
+      break;
+    }
+    case 'redistribute':handleRedistribute();break;
+    case 'validateRound':handleValidateRound();break;
+    case 'clearDraft':state.draft=emptyDraft();render();showToast('Saisie effacée');break;
+    case 'resetConfirm':if(confirm('Terminer la partie et en commencer une nouvelle ?'))resetGame();break;
+    case 'newGame':resetGame();break;
+  }
+});
+
+document.addEventListener('input',ev=>{
+  const t=ev.target.closest('[data-act]');
+  if(!t)return;
+  if(t.dataset.act==='setName'){
+    state.players[+t.dataset.i].name=t.value;saveState();
+  }else if(t.dataset.act==='setMalus'){
+    const v=parseInt(t.value,10);
+    const i=+t.dataset.i;
+    state.draft.perPlayer[i]=state.draft.perPlayer[i]||{};
+    state.draft.perPlayer[i].malus=isNaN(v)?null:Math.max(0,v);
+    saveState();
+  }
+});
+
+function handleRedistribute(){
+  const wasStarted=state.draft.started;
+  state.rounds.push({parole:true,dealerIdx:state.dealerIdx,started:wasStarted,dealerAdvanced:wasStarted,jokerRank:state.draft.jokerRank,jokerSuit:state.draft.jokerSuit,entries:[]});
+  if(wasStarted)state.dealerIdx=nextActiveAfter(state.dealerIdx);
+  state.draft=emptyDraft();render();
+  showToast(wasStarted?'Redistribution · distributeur avancé':'Redistribution · même distributeur');
+}
+
+function handleValidateRound(){
+  const d=state.draft;
+  const active=activeIndices();
+  const winnerIdx=active.find(i=>d.perPlayer[i]?.isWinner);
+  if(winnerIdx==null){showToast('Sélectionne le gagnant');return}
+  for(const i of active){
+    if(i===winnerIdx)continue;
+    const e=d.perPlayer[i]||{};
+    if(e.parole)continue;
+    if(e.malus==null||isNaN(e.malus)){showToast(`Saisis les malus de ${state.players[i].name}`);return}
+  }
+  const entries=active.map(i=>{
+    const e=d.perPlayer[i]||{};
+    let delta=0;
+    if(!e.parole&&i!==winnerIdx)delta=e.malus||0;
+    if(e.p51noFollow)delta+=51;
+    if(e.p51badLay)delta+=51;
+    return{idx:i,isWinner:i===winnerIdx,parole:!!e.parole,malus:e.malus||0,p51noFollow:!!e.p51noFollow,p51badLay:!!e.p51badLay,delta};
+  });
+  entries.forEach(e=>{
+    state.players[e.idx].score+=e.delta;
+    if(state.players[e.idx].score>=ELIMINATION)state.players[e.idx].eliminated=true;
+  });
+  state.rounds.push({parole:false,dealerIdx:state.dealerIdx,jokerRank:d.jokerRank,jokerSuit:d.jokerSuit,started:d.started,entries});
+  state.dealerIdx=nextActiveAfter(state.dealerIdx);
+  if(state.players.filter(p=>!p.eliminated).length<=1){
+    state.screen='finished';state.draft=emptyDraft();render();return;
+  }
+  state.draft=emptyDraft();state.tab='scores';render();
+  const newlyOut=entries.filter(e=>{const p=state.players[e.idx];return p.eliminated&&p.score-e.delta<ELIMINATION});
+  showToast(newlyOut.length?`${state.players[newlyOut[0].idx].name} éliminé !`:`Tour gagné par ${state.players[winnerIdx].name}`);
+}
+
+render();
+</script>
+</body>
+</html>

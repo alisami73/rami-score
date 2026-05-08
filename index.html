@@ -1022,7 +1022,26 @@ function viewTableau(){
     <button class="btn btn-ghost btn-block" data-act="redistribute" style="margin-top:10px;">↻ Nouvelle distribution</button>`;
 }
 
+function autoSetWinner(){
+  if(state.screen!=='game')return;
+  const d=state.draft;
+  const active=activeIndices();
+  if(active.some(i=>d.perPlayer[i]?.isWinner))return;
+  const filled=active.filter(i=>{
+    const e=d.perPlayer[i]||{};
+    return e.parole||e.p51noFollow||e.p51badLay||(e.malus!==null&&e.malus!==undefined&&!isNaN(e.malus));
+  });
+  if(filled.length===active.length-1){
+    const auto=active.find(i=>!filled.includes(i));
+    if(auto!=null){
+      d.perPlayer[auto]=d.perPlayer[auto]||{};
+      d.perPlayer[auto].isWinner=true;
+    }
+  }
+}
+
 function render(){
+  if(state.screen==='game')autoSetWinner();
   const root=document.getElementById('app');
   let body='';
   if(state.screen==='setup'){

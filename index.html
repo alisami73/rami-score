@@ -303,7 +303,7 @@
     border-top:1px solid var(--line-soft);padding-bottom:var(--safe-bottom);z-index:50;
   }
   .tabs::before{content:"";position:absolute;top:0;left:50%;transform:translateX(-50%);width:100px;height:1px;background:linear-gradient(90deg,transparent,var(--gold),transparent)}
-  .tabs-inner{display:grid;grid-template-columns:repeat(4,1fr)}
+  .tabs-inner{display:grid;grid-template-columns:repeat(5,1fr)}
   .tab{padding:12px 0 14px;text-align:center;color:var(--text-muted);transition:color .2s;position:relative}
   .tab .ico{display:block;font-size:22px;margin-bottom:4px;line-height:1}
   .tab .lbl{font-family:var(--display);font-size:11px;letter-spacing:.2em;text-transform:uppercase}
@@ -565,9 +565,7 @@ function renderSheet(){
           <button class="chip ${sheetData.p51badLay?'on':''}" id="sh-bl"><span class="plus">+51</span> étalage incomplet</button>
         </div>
       `:''}
-      <div style="margin-bottom:14px;">
-        <button class="chip ${sheetData.etale?'on':''}" id="sh-et" style="${sheetData.etale?'background:rgba(74,222,128,.15);border-color:var(--green);color:var(--green);':''}">⤵ Étalé</button>
-      </div>
+      <button class="win-btn ${sheetData.etale?'on':''}" id="sh-et" style="margin-bottom:14px;${sheetData.etale?'background:linear-gradient(180deg,#4ade80,#16a34a);color:#1a0a2e;border-color:var(--green);font-weight:700;':'background:rgba(74,222,128,.08);border-color:rgba(74,222,128,.3);color:var(--green);'}">⤵ &nbsp; Étalage</button>
       <div style="display:flex;gap:10px;">
         <button id="sh-cancel" class="btn btn-ghost" style="flex:1;">Annuler</button>
         <button id="sh-ok" class="btn btn-primary" style="flex:2;">Confirmer</button>
@@ -692,6 +690,7 @@ function viewTabs(){
     <button class="tab ${t==='enter'?'active':''}" data-act="setTab" data-tab="enter"><span class="ico">✎</span><span class="lbl">Saisir</span></button>
     <button class="tab ${t==='tableau'?'active':''}" data-act="setTab" data-tab="tableau"><span class="ico">⊞</span><span class="lbl">Tableau</span></button>
     <button class="tab ${t==='history'?'active':''}" data-act="setTab" data-tab="history"><span class="ico">❦</span><span class="lbl">Historique</span></button>
+    <button class="tab" data-act="resetConfirm"><span class="ico" style="font-size:18px;">✦</span><span class="lbl">Nouveau</span></button>
   </div></nav>`;
 }
 
@@ -1020,7 +1019,7 @@ function viewTableau(){
       ?`<button class="btn btn-primary btn-block" data-act="validateRound">Valider le tour ${state.rounds.length+1} ›</button>`
       :`<div style="text-align:center;font-style:italic;color:var(--text-muted);font-size:13px;">Clique sur une cellule <span style="color:var(--gold);">＋</span> pour saisir</div>`
     }
-    <button class="btn btn-ghost btn-block" data-act="resetConfirm" style="margin-top:10px;">Nouvelle partie</button>`;
+    <button class="btn btn-ghost btn-block" data-act="redistribute" style="margin-top:10px;">↻ Nouvelle distribution</button>`;
 }
 
 function render(){

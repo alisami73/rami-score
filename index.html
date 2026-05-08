@@ -627,7 +627,7 @@ function nextActiveBefore(idx){
   for(let k=1;k<=n;k++){const j=(idx-k+n)%n;if(!state.players[j].eliminated)return j}
   return idx;
 }
-function ensureDealerActive(){if(state.players[state.dealerIdx]?.eliminated)state.dealerIdx=nextActiveBefore(state.dealerIdx)}
+function ensureDealerActive(){if(state.players[state.dealerIdx]?.eliminated)state.dealerIdx=nextActiveAfter(state.dealerIdx)}
 function pickRandomDealer(){const a=activeIndices();state.dealerIdx=a[Math.floor(Math.random()*a.length)]}
 
 function scoreTone(s){if(s>=100)return'danger';if(s>=70)return'warn';return'safe'}
@@ -684,10 +684,12 @@ const AUDIO_SRCS={
   elimination:resolveAppUrl('assets/audio/joueur-sorti.m4a'),
   noFollow:resolveAppUrl('assets/audio/sans-suivi-51.m4a'),
   badLay:resolveAppUrl('assets/audio/etalage-incomplet.m4a'),
+  hakim:resolveAppUrl('assets/audio/hakim-selection.m4a'),
   snippet8:resolveAppUrl('assets/audio/snippet-8.m4a'),
   snippet9:resolveAppUrl('assets/audio/snippet-9.m4a'),
 };
 const SNIPPET_KEYS=['snippet8','snippet9'];
+function isHakimName(name){return String(name||'').trim().toLowerCase()==='hakim'}
 
 function getAudioCtx(){
   if(!audioCtx){
@@ -763,6 +765,7 @@ function playRandomSnippet(){
 function playEliminationSound(){playAudioKey('elimination');}
 function playNoFollowSound(){playAudioKey('noFollow');}
 function playBadLaySound(){playAudioKey('badLay');}
+function playHakimSound(){unlockAudio();playAudioKey('hakim');}
 
 // ---- Tableau sheet ----
 let sheetPlayerIdx=null,sheetData={};
@@ -1119,7 +1122,7 @@ function viewEnter(){
   const isEtIncompletDraft=etBadLayIdx!=null&&winnerIdx==null;
   const anyMalusEntered=active.some(i=>{const e=d.perPlayer[i]||{};return!e.isWinner&&!e.p51noFollow&&!e.p51badLay&&!e.parole&&e.malus!==null&&e.malus!==undefined&&!isNaN(e.malus);});
   const hasJoker=d.jokerRank&&d.jokerSuit;
-  const redistributionDealerIdx=d.started?nextActiveBefore(dealer):dealer;
+  const redistributionDealerIdx=d.started?nextActiveAfter(dealer):dealer;
   const redistributionDealerName=state.players[redistributionDealerIdx]?.name||'—';
 
   return`
@@ -1579,6 +1582,7 @@ document.addEventListener('click',ev=>{
       const isNew=persistCustomName(name);
       playerOtherMode.delete(i);
       render();
+      if(isHakimName(name))playHakimSound();
       showToast(isNew?`"${name}" enregistré`:`"${name}" sélectionné`);
       break;
     }
@@ -1676,6 +1680,7 @@ document.addEventListener('change',ev=>{
       state.players[i].name=val;
     }
     render();
+    if(isHakimName(state.players[i].name))playHakimSound();
   }
 });
 
@@ -1687,6 +1692,7 @@ document.addEventListener('input',ev=>{
   if(!t)return;
   if(t.dataset.act==='setName'||t.dataset.act==='customNameInput'){
     state.players[+t.dataset.i].name=t.value;saveState();
+    if(isHakimName(t.value))playHakimSound();
   }else if(t.dataset.act==='setMalus'){
     const v=parseInt(t.value,10);
     const i=+t.dataset.i;
@@ -1702,7 +1708,7 @@ document.addEventListener('input',ev=>{
 function handleRedistribute(){
   const wasStarted=state.draft.started;
   state.rounds.push({parole:true,dealerIdx:state.dealerIdx,started:wasStarted,dealerAdvanced:wasStarted,jokerRank:state.draft.jokerRank,jokerSuit:state.draft.jokerSuit,entries:[]});
-  if(wasStarted)state.dealerIdx=nextActiveBefore(state.dealerIdx);
+  if(wasStarted)state.dealerIdx=nextActiveAfter(state.dealerIdx);
   const nextDealerName=state.players[state.dealerIdx]?.name||'—';
   state.draft=emptyDraft();render();
   playRandomSnippet();
@@ -1749,7 +1755,7 @@ function handleValidateRound(){
   else if(noFollowTriggered)playNoFollowSound();
   else if(newlyOut.length)playEliminationSound();
   state.rounds.push({parole:false,dealerIdx:state.dealerIdx,jokerRank:d.jokerRank,jokerSuit:d.jokerSuit,started:d.started,entries});
-  state.dealerIdx=nextActiveBefore(state.dealerIdx);
+  state.dealerIdx=nextActiveAfter(state.dealerIdx);
   // Game ends when 2+ players are eliminated (remaining players are winners)
   if(state.players.filter(p=>p.eliminated).length>=2){
     if(state.playForCoffee){

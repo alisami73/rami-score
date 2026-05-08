@@ -368,6 +368,90 @@
     color:var(--gold-soft);transition:all .15s;
   }
   .win-btn.on{background:linear-gradient(180deg,var(--gold-soft),var(--gold-deep));color:#1a0a2e;border-color:var(--gold);font-weight:700}
+  .calc-launch{
+    flex:0 0 auto;min-width:88px;padding:10px 12px;border-radius:10px;
+    background:rgba(74,38,133,.35);border:1px solid var(--line);
+    color:var(--gold-soft);font-family:var(--display);font-size:12px;
+    letter-spacing:.14em;text-transform:uppercase;transition:all .15s;
+  }
+  .calc-launch:active{transform:translateY(1px);background:rgba(90,52,150,.42)}
+  .calc-note{
+    margin-top:8px;color:var(--text-muted);font-size:12px;
+    letter-spacing:.08em;text-transform:uppercase;
+  }
+  .calc-overlay{
+    position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:95;
+    display:flex;align-items:flex-end;justify-content:center;
+    animation:fadeIn .2s ease-out;
+  }
+  .calc-sheet{
+    background:linear-gradient(180deg,#341760 0%,#1a0a2e 100%);
+    border-radius:20px 20px 0 0;padding:0 18px calc(24px + var(--safe-bottom));
+    width:100%;max-width:520px;border-top:1px solid var(--gold-deep);
+    box-shadow:0 -8px 40px rgba(0,0,0,.65);
+    animation:sheetUp .25s cubic-bezier(.2,.8,.2,1);
+  }
+  .calc-total{
+    background:linear-gradient(180deg,#ff3b1f 0%,#e84545 100%);
+    border-radius:16px;padding:14px 16px;margin-bottom:14px;text-align:center;
+    font-family:var(--display);font-size:18px;font-weight:700;color:#fff;
+    box-shadow:0 8px 22px rgba(232,69,69,.28);
+  }
+  .calc-total.is-empty{
+    background:rgba(74,38,133,.5);color:var(--text-dim);
+    box-shadow:none;border:1px solid var(--line);
+  }
+  .calc-rank-grid{
+    display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px;
+  }
+  .calc-rank-btn{
+    position:relative;min-height:64px;border-radius:12px;padding:10px 8px;
+    background:rgba(15,6,32,.55);border:1px solid var(--line-soft);
+    color:var(--text-dim);display:flex;align-items:center;justify-content:center;
+    font-family:var(--display);font-size:20px;transition:all .15s;
+  }
+  .calc-rank-btn.active{
+    border-color:#ff4d2d;box-shadow:0 0 0 2px rgba(255,77,45,.22);
+    background:rgba(255,77,45,.08);color:var(--text);
+  }
+  .calc-rank-btn.has-count{color:var(--gold-soft)}
+  .calc-rank-count{
+    position:absolute;right:6px;bottom:6px;min-width:22px;height:22px;
+    padding:0 6px;border-radius:999px;background:#ff4d2d;color:#fff;
+    display:inline-flex;align-items:center;justify-content:center;
+    font-family:var(--display);font-size:12px;font-weight:700;
+    box-shadow:0 4px 12px rgba(255,77,45,.32);
+  }
+  .calc-count-card{
+    border:1px solid var(--line-soft);border-radius:16px;padding:16px;
+    background:rgba(15,6,32,.35);margin-bottom:14px;
+  }
+  .calc-count-head{
+    display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:12px;
+  }
+  .calc-count-head strong{
+    font-family:var(--display);font-size:24px;color:var(--text);font-weight:600;
+  }
+  .calc-count-head span{
+    color:var(--text-muted);font-size:12px;letter-spacing:.12em;text-transform:uppercase;
+  }
+  .calc-stepper{display:flex;align-items:center;gap:10px}
+  .calc-step{
+    flex:0 0 48px;height:48px;border-radius:12px;
+    background:rgba(74,38,133,.45);border:1px solid var(--line);
+    color:var(--gold-soft);font-family:var(--display);font-size:28px;line-height:1;
+  }
+  .calc-step-input{
+    text-align:center;font-family:var(--display);font-size:24px;font-weight:700;
+    font-variant-numeric:tabular-nums;
+  }
+  .calc-summary{
+    min-height:20px;color:var(--text-muted);font-size:12px;
+    text-transform:uppercase;letter-spacing:.08em;margin-bottom:14px;
+  }
+  .calc-actions{display:flex;gap:10px}
+  .calc-actions .btn{flex:1}
+  .calc-actions .btn-primary{flex:1.4}
 
   /* Game over */
   .gameover{text-align:center;padding:30px 12px 20px}
@@ -458,7 +542,35 @@ function freshSetup(){
   };
 }
 function emptyDraft(){return{jokerRank:null,jokerSuit:null,started:false,perPlayer:{}}}
-// perPlayer entry shape: {isWinner, malus, p51noFollow, p51badLay, parole, etale}
+// perPlayer entry shape: {isWinner, malus, cardCounts, p51noFollow, p51badLay, parole, etale}
+function emptyCardCounts(){return Object.fromEntries(RANKS.map(r=>[r.id,0]))}
+function normalizeCardCounts(cardCounts){
+  const clean=emptyCardCounts();
+  if(cardCounts&&typeof cardCounts==='object'){
+    RANKS.forEach(r=>{
+      const qty=parseInt(cardCounts[r.id],10);
+      clean[r.id]=Number.isFinite(qty)&&qty>0?qty:0;
+    });
+  }
+  return clean;
+}
+function hasCardCounts(cardCounts){return RANKS.some(r=>(cardCounts?.[r.id]||0)>0)}
+function cardCountsTotal(cardCounts){
+  const counts=normalizeCardCounts(cardCounts);
+  return RANKS.reduce((sum,r)=>sum+(counts[r.id]||0)*r.pts,0);
+}
+function cardCountsSummary(cardCounts){
+  const counts=normalizeCardCounts(cardCounts);
+  return RANKS.filter(r=>counts[r.id]>0).map(r=>`${r.label}×${counts[r.id]}`).join(' · ');
+}
+function cardCalculatorValue(cardCounts){
+  const counts=normalizeCardCounts(cardCounts);
+  if(!hasCardCounts(counts))return{malus:null,cardCounts:null,summary:''};
+  return{malus:cardCountsTotal(counts),cardCounts:counts,summary:cardCountsSummary(counts)};
+}
+function entryCardSummary(entry){
+  return hasCardCounts(entry?.cardCounts)?`Cartes : ${cardCountsSummary(entry.cardCounts)}`:'';
+}
 function saveState(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(state))}catch(e){}}
 function loadState(){
   try{
@@ -526,19 +638,115 @@ function showToast(text,ms=2400){
 
 // ---- Tableau sheet ----
 let sheetPlayerIdx=null,sheetData={};
+let calcContext=null;
 function openSheet(idx){
   const e=state.draft.perPlayer[idx]||{};
   sheetPlayerIdx=idx;
-  sheetData={isWinner:!!e.isWinner,malus:e.malus??null,p51noFollow:!!e.p51noFollow,p51badLay:!!e.p51badLay,etale:!!e.etale};
+  sheetData={isWinner:!!e.isWinner,malus:e.malus??null,cardCounts:normalizeCardCounts(e.cardCounts),p51noFollow:!!e.p51noFollow,p51badLay:!!e.p51badLay,etale:!!e.etale};
   renderSheet();
 }
-function closeSheet(){sheetPlayerIdx=null;sheetData={};document.getElementById('sheet-overlay')?.remove()}
+function closeSheet(){
+  if(calcContext?.source==='sheet')closeCardCalculator();
+  sheetPlayerIdx=null;sheetData={};document.getElementById('sheet-overlay')?.remove();
+}
 function applySheet(){
   if(sheetPlayerIdx===null)return;
   const idx=sheetPlayerIdx;
   if(sheetData.isWinner)activeIndices().forEach(j=>{if(state.draft.perPlayer[j])state.draft.perPlayer[j].isWinner=false});
-  state.draft.perPlayer[idx]={isWinner:sheetData.isWinner,malus:sheetData.malus,p51noFollow:sheetData.p51noFollow,p51badLay:sheetData.p51badLay,etale:sheetData.etale,parole:false};
+  state.draft.perPlayer[idx]={isWinner:sheetData.isWinner,malus:sheetData.malus,cardCounts:hasCardCounts(sheetData.cardCounts)?normalizeCardCounts(sheetData.cardCounts):null,p51noFollow:sheetData.p51noFollow,p51badLay:sheetData.p51badLay,etale:sheetData.etale,parole:false};
   closeSheet();render();
+}
+function firstCalcRank(cardCounts){return RANKS.find(r=>(cardCounts?.[r.id]||0)>0)?.id||RANKS[0].id}
+function openCardCalculator(source,idx){
+  const base=source==='sheet'?sheetData:(state.draft.perPlayer[idx]||{});
+  const counts=normalizeCardCounts(base.cardCounts);
+  calcContext={source,idx,cardCounts:counts,selectedRank:firstCalcRank(counts)};
+  renderCardCalculator();
+}
+function closeCardCalculator(){calcContext=null;document.getElementById('calc-overlay')?.remove()}
+function setCalcRankCount(rankId,nextValue){
+  if(!calcContext)return;
+  const qty=Math.max(0,Math.min(20,Number.isFinite(nextValue)?nextValue:0));
+  calcContext.cardCounts[rankId]=qty;
+  calcContext.selectedRank=rankId;
+  renderCardCalculator();
+}
+function clearCardCalculator(){
+  if(!calcContext)return;
+  calcContext.cardCounts=emptyCardCounts();
+  calcContext.selectedRank=RANKS[0].id;
+  renderCardCalculator();
+}
+function applyCardCalculator(){
+  if(!calcContext)return;
+  const result=cardCalculatorValue(calcContext.cardCounts);
+  if(calcContext.source==='sheet'){
+    sheetData.cardCounts=result.cardCounts?normalizeCardCounts(result.cardCounts):emptyCardCounts();
+    sheetData.malus=result.malus;
+    closeCardCalculator();
+    renderSheet();
+    return;
+  }
+  const e=state.draft.perPlayer[calcContext.idx]=state.draft.perPlayer[calcContext.idx]||{};
+  e.cardCounts=result.cardCounts;
+  e.malus=result.malus;
+  closeCardCalculator();
+  render();
+}
+function renderCardCalculator(){
+  document.getElementById('calc-overlay')?.remove();
+  if(!calcContext)return;
+  calcContext.cardCounts=normalizeCardCounts(calcContext.cardCounts);
+  calcContext.selectedRank=RANK_BY_ID[calcContext.selectedRank]?calcContext.selectedRank:firstCalcRank(calcContext.cardCounts);
+  const p=state.players[calcContext.idx];
+  const total=cardCountsTotal(calcContext.cardCounts);
+  const hasCards=hasCardCounts(calcContext.cardCounts);
+  const selectedRank=RANK_BY_ID[calcContext.selectedRank];
+  const qty=calcContext.cardCounts[calcContext.selectedRank]||0;
+  const summary=hasCards?cardCountsSummary(calcContext.cardCounts):'Aucune carte sélectionnée';
+  const el=document.createElement('div');
+  el.id='calc-overlay';el.className='calc-overlay';
+  el.innerHTML=`
+    <div class="calc-sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-lbl">Calculatrice cartes</div>
+      <div class="sh-player">${avatar(p.name,calcContext.idx,'lg')}<div class="nm">${esc(p.name)}</div></div>
+      <div class="calc-total ${hasCards?'':'is-empty'}">${hasCards?`Cartes restantes = ${total} point${total>1?'s':''} malus`:'Sélectionne les cartes restantes'}</div>
+      <div class="calc-rank-grid">
+        ${RANKS.map(r=>`<button class="calc-rank-btn ${calcContext.selectedRank===r.id?'active':''} ${calcContext.cardCounts[r.id]?'has-count':''}" data-calc-rank="${r.id}">${r.label}${calcContext.cardCounts[r.id]?`<span class="calc-rank-count">${calcContext.cardCounts[r.id]}</span>`:''}</button>`).join('')}
+      </div>
+      <div class="calc-count-card">
+        <div class="calc-count-head">
+          <strong>${selectedRank.label}</strong>
+          <span>${selectedRank.pts} pts par carte</span>
+        </div>
+        <div class="calc-stepper">
+          <button class="calc-step" id="calc-minus">−</button>
+          <input type="number" id="calc-qty" class="calc-step-input" inputmode="numeric" min="0" max="20" value="${qty}">
+          <button class="calc-step" id="calc-plus">+</button>
+        </div>
+      </div>
+      <div class="calc-summary">${summary}</div>
+      <div class="calc-actions">
+        <button id="calc-cancel" class="btn btn-ghost">Annuler</button>
+        <button id="calc-clear" class="btn btn-ghost">Effacer</button>
+        <button id="calc-ok" class="btn btn-primary">Appliquer</button>
+      </div>
+    </div>`;
+  el.querySelectorAll('[data-calc-rank]').forEach(btn=>{
+    btn.onclick=()=>{calcContext.selectedRank=btn.dataset.calcRank;renderCardCalculator()};
+  });
+  el.querySelector('#calc-minus').onclick=()=>setCalcRankCount(calcContext.selectedRank,qty-1);
+  el.querySelector('#calc-plus').onclick=()=>setCalcRankCount(calcContext.selectedRank,qty+1);
+  el.querySelector('#calc-qty').addEventListener('change',ev=>{
+    const next=parseInt(ev.target.value,10);
+    setCalcRankCount(calcContext.selectedRank,isNaN(next)?0:next);
+  });
+  el.querySelector('#calc-cancel').onclick=closeCardCalculator;
+  el.querySelector('#calc-clear').onclick=clearCardCalculator;
+  el.querySelector('#calc-ok').onclick=applyCardCalculator;
+  el.addEventListener('click',ev=>{if(ev.target===el)closeCardCalculator()});
+  document.body.appendChild(el);
 }
 function renderSheet(){
   document.getElementById('sheet-overlay')?.remove();
@@ -558,7 +766,11 @@ function renderSheet(){
       ${!sheetData.isWinner?`
         ${hasPen
           ?`<div style="text-align:center;color:var(--red);font-size:15px;padding:10px 0;">Pénalité : +${penPts} pts</div>`
-          :`<input type="number" id="sh-malus" inputmode="numeric" min="0" max="300" placeholder="Points de cartes restantes" value="${sheetData.malus??''}" style="width:100%;background:rgba(15,6,32,.6);border:1px solid var(--line-soft);border-radius:10px;padding:12px 14px;color:var(--text);font-family:var(--serif);font-size:18px;outline:none;margin-bottom:10px;display:block;-moz-appearance:textfield;">`
+          :`<div class="row" style="margin-bottom:10px;">
+              <div class="malus-input"><input type="number" id="sh-malus" inputmode="numeric" min="0" max="300" placeholder="Points de cartes restantes" value="${sheetData.malus??''}" style="width:100%;background:rgba(15,6,32,.6);border:1px solid var(--line-soft);border-radius:10px;padding:12px 14px;color:var(--text);font-family:var(--serif);font-size:18px;outline:none;display:block;-moz-appearance:textfield;"></div>
+              <button class="calc-launch" id="sh-calc">Calcul</button>
+            </div>
+            ${hasCardCounts(sheetData.cardCounts)?`<div class="calc-note" style="margin-top:0;margin-bottom:10px;">${entryCardSummary(sheetData)}</div>`:''}`
         }
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
           <button class="chip ${sheetData.p51noFollow?'on':''}" id="sh-nf"><span class="plus">+51</span> sans suivi</button>
@@ -571,11 +783,17 @@ function renderSheet(){
         <button id="sh-ok" class="btn btn-primary" style="flex:2;">Confirmer</button>
       </div>
     </div>`;
-  el.querySelector('#sh-win').onclick=()=>{sheetData.isWinner=!sheetData.isWinner;if(sheetData.isWinner){sheetData.p51noFollow=false;sheetData.p51badLay=false;sheetData.malus=null}renderSheet()};
+  el.querySelector('#sh-win').onclick=()=>{sheetData.isWinner=!sheetData.isWinner;if(sheetData.isWinner){sheetData.p51noFollow=false;sheetData.p51badLay=false;sheetData.malus=null;sheetData.cardCounts=emptyCardCounts()}renderSheet()};
   const shNf=el.querySelector('#sh-nf');if(shNf)shNf.onclick=()=>{sheetData.p51noFollow=!sheetData.p51noFollow;sheetData.isWinner=false;renderSheet()};
   const shBl=el.querySelector('#sh-bl');if(shBl)shBl.onclick=()=>{sheetData.p51badLay=!sheetData.p51badLay;sheetData.isWinner=false;renderSheet()};
   el.querySelector('#sh-et').onclick=()=>{sheetData.etale=!sheetData.etale;renderSheet()};
-  el.querySelector('#sh-malus')?.addEventListener('input',ev=>{const v=parseInt(ev.target.value,10);sheetData.malus=isNaN(v)?null:Math.max(0,v)});
+  el.querySelector('#sh-malus')?.addEventListener('input',ev=>{
+    const v=parseInt(ev.target.value,10);
+    sheetData.malus=isNaN(v)?null:Math.max(0,v);
+    sheetData.cardCounts=emptyCardCounts();
+    el.querySelector('.calc-note')?.remove();
+  });
+  el.querySelector('#sh-calc')?.addEventListener('click',()=>openCardCalculator('sheet',sheetPlayerIdx));
   el.querySelector('#sh-cancel').onclick=closeSheet;
   el.querySelector('#sh-ok').onclick=applySheet;
   el.addEventListener('click',ev=>{if(ev.target===el)closeSheet()});
@@ -747,6 +965,8 @@ function viewEnter(){
   const active=activeIndices();
   const allParole=active.length>0&&active.every(i=>d.perPlayer[i]?.parole);
   const winnerIdx=active.find(i=>d.perPlayer[i]?.isWinner);
+  const etBadLayIdx=active.find(i=>d.perPlayer[i]?.p51badLay);
+  const isEtIncompletDraft=etBadLayIdx!=null&&winnerIdx==null;
   const hasJoker=d.jokerRank&&d.jokerSuit;
 
   return`
@@ -806,7 +1026,13 @@ function viewEnter(){
             ?`<div style="font-style:italic;color:var(--gold-soft);font-size:14px;">★ Gagnant — 0 pt de malus</div>`
             :hasPenalty
               ?`<div style="font-style:italic;color:var(--red);font-size:15px;">Pénalité : +${penaltyTotal} pts</div>`
-              :!isPar?`<div class="row"><div class="malus-input"><input type="number" inputmode="numeric" min="0" max="300" placeholder="Points de cartes restantes" value="${e.malus??''}" data-act="setMalus" data-i="${i}"></div></div>`:''
+              :!isPar?`
+                <div class="row">
+                  <div class="malus-input"><input type="number" inputmode="numeric" min="0" max="300" placeholder="Points de cartes restantes" value="${e.malus??''}" data-act="setMalus" data-i="${i}"></div>
+                  <button class="calc-launch" data-act="openCalc" data-i="${i}">Calcul</button>
+                </div>
+                ${hasCardCounts(e.cardCounts)?`<div class="calc-note">${entryCardSummary(e)}</div>`:''}
+              `:''
           }
           <div class="penalty-toggle">
             <button class="chip chip-parole ${isPar?'on':''}" data-act="toggleParole" data-i="${i}">${isPar?'✓ ':''}Parole</button>
@@ -827,8 +1053,8 @@ function viewEnter(){
         </div>`
       :`<div class="row-flex">
           <button class="btn btn-ghost" data-act="clearDraft">Effacer</button>
-          <button class="btn btn-primary" data-act="validateRound" ${winnerIdx==null?'disabled':''}>
-            ${winnerIdx==null?'Choisir un gagnant':'Valider le tour ›'}
+          <button class="btn btn-primary" data-act="validateRound" ${winnerIdx==null&&!isEtIncompletDraft?'disabled':''}>
+            ${isEtIncompletDraft?'Valider — Étalage incomplet ›':winnerIdx==null?'Choisir un gagnant':'Valider le tour ›'}
           </button>
         </div>`
     }`;
@@ -969,8 +1195,10 @@ function viewTableau(){
   }).join('');
 
   // Validate button check
-  const canValidate=winnerIdx!=null&&active.every(i=>{
-    if(i===winnerIdx)return true;
+  const badLayIdx=active.find(i=>d.perPlayer[i]?.p51badLay);
+  const isEtIncomplet=badLayIdx!=null&&winnerIdx==null;
+  const canValidate=(winnerIdx!=null||isEtIncomplet)&&active.every(i=>{
+    if(i===winnerIdx||isEtIncomplet)return true;
     const e=d.perPlayer[i]||{};
     if(e.parole||e.p51noFollow||e.p51badLay)return true;
     return e.malus!==null&&!isNaN(e.malus);
@@ -1050,10 +1278,25 @@ function undoLastRound(){
   showToast('Tour annulé ↩');
 }
 
-function autoSetWinner(){
+function autoCompleteRound(){
   if(state.screen!=='game')return;
   const d=state.draft;
   const active=activeIndices();
+  // Étalage incomplet: auto-fill malus=0 for all others, no winner
+  const badLayIdx=active.find(i=>d.perPlayer[i]?.p51badLay);
+  if(badLayIdx!=null){
+    active.forEach(i=>{
+      if(i===badLayIdx)return;
+      const e=d.perPlayer[i]||{};
+      if(!e.parole&&!e.p51noFollow&&!e.p51badLay){
+        d.perPlayer[i]=d.perPlayer[i]||{};
+        d.perPlayer[i].malus=0;
+        d.perPlayer[i].isWinner=false;
+      }
+    });
+    return;
+  }
+  // Normal round: auto-set winner when all others are filled
   if(active.some(i=>d.perPlayer[i]?.isWinner))return;
   const filled=active.filter(i=>{
     const e=d.perPlayer[i]||{};
@@ -1088,7 +1331,7 @@ function viewPickDealer(){
 }
 
 function render(){
-  if(state.screen==='game')autoSetWinner();
+  if(state.screen==='game')autoCompleteRound();
   const root=document.getElementById('app');
   let body='';
   if(state.screen==='setup'){
@@ -1141,12 +1384,13 @@ document.addEventListener('click',ev=>{
       showToast(`${state.players[i].name} distribue en premier`);
       break;
     }
-    case 'setTab':closeSheet();state.tab=t.dataset.tab;render();break;
+    case 'setTab':closeCardCalculator();closeSheet();state.tab=t.dataset.tab;render();break;
     case 'tapCell':{
       const i=+t.dataset.i;
       if(!state.players[i].eliminated)openSheet(i);
       break;
     }
+    case 'openCalc':openCardCalculator('draft',+t.dataset.i);break;
     case 'pickRank':state.draft.jokerRank=t.dataset.r;render();break;
     case 'pickSuit':state.draft.jokerSuit=t.dataset.s;render();break;
     case 'toggleStarted':state.draft.started=!state.draft.started;render();break;
@@ -1159,6 +1403,7 @@ document.addEventListener('click',ev=>{
         state.draft.perPlayer[i]=state.draft.perPlayer[i]||{};
         state.draft.perPlayer[i].isWinner=true;
         state.draft.perPlayer[i].malus=0;
+        state.draft.perPlayer[i].cardCounts=null;
       }
       render();break;
     }
@@ -1166,7 +1411,7 @@ document.addEventListener('click',ev=>{
       const i=+t.dataset.i;
       const e=state.draft.perPlayer[i]=state.draft.perPlayer[i]||{};
       e.parole=!e.parole;
-      if(e.parole){e.isWinner=false;e.malus=0;e.p51noFollow=false;e.p51badLay=false}
+      if(e.parole){e.isWinner=false;e.malus=0;e.cardCounts=null;e.p51noFollow=false;e.p51badLay=false}
       render();break;
     }
     case 'toggleP51nf':{
@@ -1217,6 +1462,8 @@ document.addEventListener('input',ev=>{
     const i=+t.dataset.i;
     state.draft.perPlayer[i]=state.draft.perPlayer[i]||{};
     state.draft.perPlayer[i].malus=isNaN(v)?null:Math.max(0,v);
+    state.draft.perPlayer[i].cardCounts=null;
+    t.closest('.player-entry')?.querySelector('.calc-note')?.remove();
     saveState();
   }
 });
@@ -1233,24 +1480,30 @@ function handleValidateRound(){
   const d=state.draft;
   const active=activeIndices();
   const winnerIdx=active.find(i=>d.perPlayer[i]?.isWinner);
-  if(winnerIdx==null){showToast('Sélectionne le gagnant');return}
-  for(const i of active){
-    if(i===winnerIdx)continue;
-    const e=d.perPlayer[i]||{};
-    if(e.parole||e.p51noFollow||e.p51badLay)continue;
-    if(e.malus==null||isNaN(e.malus)){showToast(`Saisis les points de ${state.players[i].name}`);return}
+  const badLayIdx=active.find(i=>d.perPlayer[i]?.p51badLay);
+  const isEtIncomplet=badLayIdx!=null&&winnerIdx==null;
+  if(winnerIdx==null&&!isEtIncomplet){showToast('Sélectionne le gagnant');return}
+  if(!isEtIncomplet){
+    for(const i of active){
+      if(i===winnerIdx)continue;
+      const e=d.perPlayer[i]||{};
+      if(e.parole||e.p51noFollow||e.p51badLay)continue;
+      if(e.malus==null||isNaN(e.malus)){showToast(`Saisis les points de ${state.players[i].name}`);return}
+    }
   }
   const entries=active.map(i=>{
     const e=d.perPlayer[i]||{};
     let delta=0;
-    if(!e.parole&&i!==winnerIdx){
+    if(isEtIncomplet){
+      delta=i===badLayIdx?51:0;
+    }else if(!e.parole&&i!==winnerIdx){
       if(e.p51noFollow||e.p51badLay){
         delta=(e.p51noFollow?51:0)+(e.p51badLay?51:0);
       }else{
         delta=e.malus||0;
       }
     }
-    return{idx:i,isWinner:i===winnerIdx,parole:!!e.parole,malus:e.malus||0,p51noFollow:!!e.p51noFollow,p51badLay:!!e.p51badLay,etale:!!e.etale,delta};
+    return{idx:i,isWinner:!isEtIncomplet&&i===winnerIdx,parole:!!e.parole,malus:isEtIncomplet&&i!==badLayIdx?0:(e.malus||0),p51noFollow:!!e.p51noFollow,p51badLay:!!e.p51badLay,etale:!!e.etale,delta};
   });
   entries.forEach(e=>{
     state.players[e.idx].score+=e.delta;
@@ -1258,14 +1511,16 @@ function handleValidateRound(){
   });
   state.rounds.push({parole:false,dealerIdx:state.dealerIdx,jokerRank:d.jokerRank,jokerSuit:d.jokerSuit,started:d.started,entries});
   state.dealerIdx=nextActiveAfter(state.dealerIdx);
-  if(state.players.filter(p=>!p.eliminated).length<=1){
+  // Game ends when 2+ players are eliminated (remaining players are winners)
+  if(state.players.filter(p=>p.eliminated).length>=2){
     state.screen='finished';state.draft=emptyDraft();render();saveGame();return;
   }
   state.draft=emptyDraft();
   if(state.tab!=='tableau')state.tab='scores';
   render();
   const newlyOut=entries.filter(e=>{const p=state.players[e.idx];return p.eliminated&&p.score-e.delta<ELIMINATION});
-  showToast(newlyOut.length?`${state.players[newlyOut[0].idx].name} éliminé !`:`Tour gagné par ${state.players[winnerIdx].name}`);
+  const toastMsg=newlyOut.length?`${state.players[newlyOut[0].idx].name} éliminé !`:isEtIncomplet?`Étalage incomplet — ${state.players[badLayIdx].name} +51`:winnerIdx!=null?`Tour gagné par ${state.players[winnerIdx].name}`:'Tour validé';
+  showToast(toastMsg);
 }
 
 render();

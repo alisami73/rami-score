@@ -369,10 +369,12 @@
   }
   .win-btn.on{background:linear-gradient(180deg,var(--gold-soft),var(--gold-deep));color:#1a0a2e;border-color:var(--gold);font-weight:700}
   .calc-launch{
-    flex:0 0 auto;min-width:88px;padding:10px 12px;border-radius:10px;
-    background:rgba(74,38,133,.35);border:1px solid var(--line);
-    color:var(--gold-soft);font-family:var(--display);font-size:12px;
-    letter-spacing:.14em;text-transform:uppercase;transition:all .15s;
+    display:flex;align-items:center;justify-content:center;gap:8px;
+    width:100%;min-height:44px;padding:10px 14px;border-radius:12px;
+    background:linear-gradient(180deg,rgba(201,162,39,.18),rgba(138,110,21,.24));
+    border:1px solid var(--gold-deep);color:var(--gold-soft);
+    font-family:var(--display);font-size:12px;letter-spacing:.14em;
+    text-transform:uppercase;transition:all .15s;
   }
   .calc-launch:active{transform:translateY(1px);background:rgba(90,52,150,.42)}
   .calc-note{
@@ -766,9 +768,9 @@ function renderSheet(){
       ${!sheetData.isWinner?`
         ${hasPen
           ?`<div style="text-align:center;color:var(--red);font-size:15px;padding:10px 0;">Pénalité : +${penPts} pts</div>`
-          :`<div class="row" style="margin-bottom:10px;">
-              <div class="malus-input"><input type="number" id="sh-malus" inputmode="numeric" min="0" max="300" placeholder="Points de cartes restantes" value="${sheetData.malus??''}" style="width:100%;background:rgba(15,6,32,.6);border:1px solid var(--line-soft);border-radius:10px;padding:12px 14px;color:var(--text);font-family:var(--serif);font-size:18px;outline:none;display:block;-moz-appearance:textfield;"></div>
-              <button class="calc-launch" id="sh-calc">Calcul</button>
+          :`<div style="margin-bottom:10px;">
+              <div class="malus-input" style="margin-bottom:10px;"><input type="number" id="sh-malus" inputmode="numeric" min="0" max="300" placeholder="Points de cartes restantes" value="${sheetData.malus??''}" style="width:100%;background:rgba(15,6,32,.6);border:1px solid var(--line-soft);border-radius:10px;padding:12px 14px;color:var(--text);font-family:var(--serif);font-size:18px;outline:none;display:block;-moz-appearance:textfield;"></div>
+              <button class="calc-launch" id="sh-calc">Calculatrice cartes</button>
             </div>
             ${hasCardCounts(sheetData.cardCounts)?`<div class="calc-note" style="margin-top:0;margin-bottom:10px;">${entryCardSummary(sheetData)}</div>`:''}`
         }
@@ -1027,9 +1029,9 @@ function viewEnter(){
             :hasPenalty
               ?`<div style="font-style:italic;color:var(--red);font-size:15px;">Pénalité : +${penaltyTotal} pts</div>`
               :!isPar?`
-                <div class="row">
-                  <div class="malus-input"><input type="number" inputmode="numeric" min="0" max="300" placeholder="Points de cartes restantes" value="${e.malus??''}" data-act="setMalus" data-i="${i}"></div>
-                  <button class="calc-launch" data-act="openCalc" data-i="${i}">Calcul</button>
+                <div>
+                  <div class="malus-input" style="margin-bottom:10px;"><input type="number" inputmode="numeric" min="0" max="300" placeholder="Points de cartes restantes" value="${e.malus??''}" data-act="setMalus" data-i="${i}"></div>
+                  <button class="calc-launch" data-act="openCalc" data-i="${i}">Calculatrice cartes</button>
                 </div>
                 ${hasCardCounts(e.cardCounts)?`<div class="calc-note">${entryCardSummary(e)}</div>`:''}
               `:''
@@ -1098,26 +1100,35 @@ function viewFinished(){
     if(a.eliminated!==b.eliminated)return a.eliminated?1:-1;
     return a.score-b.score;
   });
-  const winner=sorted[0];
+  const winners=sorted.filter(p=>!p.eliminated);
+  const plural=winners.length>1;
+  const winnersHeader=plural
+    ?`<div style="display:flex;align-items:center;justify-content:center;gap:18px;margin:16px 0 8px;flex-wrap:wrap;">
+        ${winners.map(w=>`<div style="display:flex;flex-direction:column;align-items:center;gap:6px;">${avatar(w.name,w.idx,'lg')}<div class="winner-name" style="font-size:22px;">${esc(w.name)}</div></div>`).join('')}
+      </div>
+      <div class="winner-sub">${winners.map(w=>w.score+' pts').join(' · ')} · co-vainqueurs</div>`
+    :`<div style="display:flex;align-items:center;justify-content:center;gap:14px;margin:16px 0 8px;">
+        ${avatar(winners[0].name,winners[0].idx,'lg')}
+        <div class="winner-name">${esc(winners[0].name)}</div>
+      </div>
+      <div class="winner-sub">${winners[0].score} points · partie remportée</div>`;
   return`<div class="content no-tabs fade-in">
     <div class="gameover">
       <div class="crown">♛</div>
-      <h2>Vainqueur</h2>
-      <div style="display:flex;align-items:center;justify-content:center;gap:14px;margin:16px 0 8px;">
-        ${avatar(winner.name,winner.idx,'lg')}
-        <div class="winner-name">${esc(winner.name)}</div>
-      </div>
-      <div class="winner-sub">${winner.score} points · partie remportée</div>
+      <h2>${plural?'Vainqueurs':'Vainqueur'}</h2>
+      ${winnersHeader}
     </div>
     <div class="panel">
       <div class="panel-title">Classement final</div>
-      ${sorted.map((p,i)=>`
-        <div class="ranking-row ${i===0?'gold':''}">
-          <div class="pos">${i+1}</div>
+      ${sorted.map((p,i)=>{
+        const isWinner=!p.eliminated;
+        return`<div class="ranking-row ${isWinner?'gold':''}">
+          <div class="pos">${isWinner?'★':i+1}</div>
           ${avatar(p.name,p.idx,'md')}
-          <div class="nm">${esc(p.name)} ${p.eliminated?`<span class="badge badge-out" style="font-size:9px;">Éliminé</span> <span style="font-size:18px;" title="Offre la consommation">☕</span>`:''}</div>
+          <div class="nm">${esc(p.name)} ${p.eliminated?`<span class="badge badge-out" style="font-size:9px;">Éliminé</span> <span style="font-size:18px;">☕</span>`:''}</div>
           <div class="pt">${p.score} pts</div>
-        </div>`).join('')}
+        </div>`;
+      }).join('')}
     </div>
     <div class="panel">
       <div class="panel-title">Récapitulatif</div>
@@ -1191,7 +1202,7 @@ function viewTableau(){
       const willOut=proj>=ELIMINATION;
       return`<td class="ci-tap" data-act="tapCell" data-i="${i}"><div class="ci ${willOut?'ci-pen':''}">${isD?'<span class="ic ic-d">D</span>':''}<span class="ci-total">${proj}</span><span class="ci-delta">+${e.malus}</span>${willOut?'<span class="ic ic-51" style="font-size:8px;margin-top:1px;">SORTI</span>':''}${e.etale?'<span class="ic ic-e">E</span>':''}</div></td>`;
     }
-    return`<td class="ci-tap" data-act="tapCell" data-i="${i}"><div class="ci">${isD?'<span class="ic ic-d" style="margin-bottom:2px;">D</span>':''}<span class="ci-empty">＋</span></div></td>`;
+    return`<td class="ci-tap" data-act="tapCell" data-i="${i}"><div class="ci">${isD?'<span class="ic ic-d" style="margin-bottom:2px;">D</span>':''}<span class="ci-total" style="color:var(--gold-soft);font-size:11px;">Calcul</span><span class="ci-delta">toucher</span></div></td>`;
   }).join('');
 
   // Validate button check
@@ -1257,7 +1268,7 @@ function viewTableau(){
     </div>
     ${canValidate
       ?`<button class="btn btn-primary btn-block" data-act="validateRound">Valider le tour ${state.rounds.length+1} ›</button>`
-      :`<div style="text-align:center;font-style:italic;color:var(--text-muted);font-size:13px;">Clique sur une cellule <span style="color:var(--gold);">＋</span> pour saisir</div>`
+      :`<div style="text-align:center;font-style:italic;color:var(--text-muted);font-size:13px;">Clique sur une cellule <span style="color:var(--gold);">Calcul</span> pour ouvrir la saisie</div>`
     }
     <button class="btn btn-ghost btn-block" data-act="redistribute" style="margin-top:10px;">↻ Nouvelle distribution</button>`;
 }

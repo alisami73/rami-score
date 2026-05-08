@@ -152,6 +152,26 @@
     display:flex;align-items:center;justify-content:center;flex:0 0 38px;
     font-family:var(--display);font-size:16px;font-weight:600;
   }
+  .name-select-wrap{position:relative;width:100%}
+  .name-select-wrap::after{content:"▾";position:absolute;right:14px;top:50%;transform:translateY(-50%);color:var(--gold);pointer-events:none;font-size:16px}
+  select{
+    appearance:none;-webkit-appearance:none;
+    background:rgba(15,6,32,.6);border:1px solid var(--line-soft);border-radius:10px;
+    padding:12px 36px 12px 14px;color:var(--text);width:100%;
+    font-family:var(--serif);font-size:18px;outline:none;cursor:pointer;
+    transition:border-color .2s,box-shadow .2s;
+  }
+  select:focus{border-color:var(--gold);box-shadow:0 0 0 3px var(--gold-glow)}
+  select option{background:#1a0a2e;color:var(--text)}
+  .autre-row{display:flex;gap:8px;margin-top:8px;align-items:center}
+  .autre-row input{flex:1;padding:10px 14px;font-size:17px}
+  .btn-save{
+    flex:0 0 auto;padding:10px 16px;border-radius:10px;
+    background:linear-gradient(180deg,var(--gold-soft),var(--gold-deep));
+    color:#1a0a2e;font-family:var(--display);font-size:13px;letter-spacing:.12em;
+    text-transform:uppercase;font-weight:700;white-space:nowrap;
+    box-shadow:0 2px 8px rgba(201,162,39,.3);
+  }
 
   /* Card face */
   .card-face{
@@ -346,6 +366,21 @@ const STORAGE_KEY='rami-v2';
 const PLAYER_COLORS=['#e84545','#4ade80','#c9a227','#7888a8'];
 const PLAYER_TEXT =['#f4ecd8','#1a0a2e','#1a0a2e','#f4ecd8'];
 
+const PRESET_NAMES=['Redouane','Hlyba','Hicham','Nabil','Karim','Fouad','Aziz','Ali','Hakim'];
+const CUSTOM_NAMES_KEY='rami-custom-names';
+let customNames=[];
+try{customNames=JSON.parse(localStorage.getItem(CUSTOM_NAMES_KEY)||'[]')}catch(e){}
+const playerOtherMode=new Set();
+
+function allNames(){return[...PRESET_NAMES,...customNames]}
+function persistCustomName(name){
+  name=name.trim();
+  if(!name||allNames().includes(name))return false;
+  customNames.push(name);
+  try{localStorage.setItem(CUSTOM_NAMES_KEY,JSON.stringify(customNames))}catch(e){}
+  return true;
+}
+
 let state=loadState()||freshSetup();
 let toastTimer=null;
 
@@ -467,11 +502,27 @@ function viewSetup(){
         ${[2,3,4].map(n=>`<button class="count-pill ${nbPlayers===n?'active':''}" data-act="setN" data-n="${n}"><span class="num">${n}</span><span class="lbl">Joueurs</span></button>`).join('')}
       </div>
       <div>
-        ${players.slice(0,nbPlayers).map((p,i)=>`
-          <div class="name-row">
-            <div class="seat" style="background:${PLAYER_COLORS[i]}22;border:2px solid ${PLAYER_COLORS[i]};color:${PLAYER_COLORS[i]};">${i+1}</div>
-            <input type="text" placeholder="Nom du joueur ${i+1}" value="${esc(p.name)}" data-act="setName" data-i="${i}" maxlength="20" autocomplete="off"/>
-          </div>`).join('')}
+        ${players.slice(0,nbPlayers).map((p,i)=>{
+          const names=allNames();
+          const isOther=playerOtherMode.has(i)||(p.name&&!names.includes(p.name));
+          const selectVal=isOther?'__autre__':(p.name||'');
+          return`<div class="name-row" style="flex-direction:column;align-items:stretch;">
+            <div style="display:flex;align-items:center;gap:12px;">
+              <div class="seat" style="background:${PLAYER_COLORS[i]}22;border:2px solid ${PLAYER_COLORS[i]};color:${PLAYER_COLORS[i]};flex:0 0 38px;">${i+1}</div>
+              <div class="name-select-wrap">
+                <select data-act="nameSelect" data-i="${i}">
+                  <option value="">— Joueur ${i+1} —</option>
+                  ${names.map(n=>`<option value="${esc(n)}" ${selectVal===n?'selected':''}>${esc(n)}</option>`).join('')}
+                  <option value="__autre__" ${isOther?'selected':''}>✎ Autre…</option>
+                </select>
+              </div>
+            </div>
+            ${isOther?`<div class="autre-row" style="padding-left:50px;">
+              <input type="text" placeholder="Nouveau nom…" value="${esc(isOther&&p.name&&!PRESET_NAMES.includes(p.name)?p.name:'')}" data-act="customNameInput" data-i="${i}" maxlength="20" autocomplete="off"/>
+              <button class="btn-save" data-act="addCustomName" data-i="${i}">Enregistrer</button>
+            </div>`:''}
+          </div>`;
+        }).join('')}
       </div>
     </div>
     <div class="panel panel-gold">
@@ -723,6 +774,28 @@ document.addEventListener('click',ev=>{
       while(state.players.length<n)state.players.push({name:'',score:0,eliminated:false});
       render();break;
     }
+    case 'nameSelect':{
+      const i=+t.dataset.i;
+      const val=t.value;
+      if(val==='__autre__'){
+        playerOtherMode.add(i);
+        state.players[i].name='';
+      }else{
+        playerOtherMode.delete(i);
+        state.players[i].name=val;
+      }
+      render();break;
+    }
+    case 'addCustomName':{
+      const i=+t.dataset.i;
+      const name=state.players[i].name.trim();
+      if(!name){showToast('Saisis un nom');return}
+      const isNew=persistCustomName(name);
+      playerOtherMode.delete(i);
+      render();
+      showToast(isNew?`"${name}" enregistré`:`"${name}" sélectionné`);
+      break;
+    }
     case 'startGame':{
       const names=state.players.slice(0,state.nbPlayers).map(p=>p.name.trim());
       if(names.some(n=>!n)){showToast('Saisis tous les noms');return}
@@ -779,7 +852,7 @@ document.addEventListener('click',ev=>{
 document.addEventListener('input',ev=>{
   const t=ev.target.closest('[data-act]');
   if(!t)return;
-  if(t.dataset.act==='setName'){
+  if(t.dataset.act==='setName'||t.dataset.act==='customNameInput'){
     state.players[+t.dataset.i].name=t.value;saveState();
   }else if(t.dataset.act==='setMalus'){
     const v=parseInt(t.value,10);

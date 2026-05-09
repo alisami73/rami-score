@@ -766,6 +766,20 @@ function playEliminationSound(){playAudioKey('elimination');}
 function playNoFollowSound(){playAudioKey('noFollow');}
 function playBadLaySound(){playAudioKey('badLay');}
 function playHakimSound(){unlockAudio();playAudioKey('hakim');}
+function getCustomNameField(i){
+  return document.querySelector(`[data-act="customNameInput"][data-i="${i}"]`);
+}
+function commitCustomName(i,rawName){
+  const name=String(rawName||'').trim();
+  if(!name){showToast('Saisis un nom');return false;}
+  state.players[i].name=name;
+  const isNew=persistCustomName(name);
+  playerOtherMode.delete(i);
+  render();
+  if(isHakimName(name))playHakimSound();
+  showToast(isNew?`"${name}" enregistré`:`"${name}" sélectionné`);
+  return true;
+}
 
 // ---- Tableau sheet ----
 let sheetPlayerIdx=null,sheetData={};
@@ -950,6 +964,110 @@ function renderSheet(){
   document.body.appendChild(el);
 }
 
+// ---- Score correction overlay ----
+let correctionCtx=null;
+function openCorrectionOverlay(playerIdx){
+  correctionCtx={playerIdx};
+  renderCorrectionOverlay();
+}
+function closeCorrectionOverlay(){
+  correctionCtx=null;
+  document.getElementById('corr-overlay')?.remove();
+}
+function renderCorrectionOverlay(){
+  document.getElementById('corr-overlay')?.remove();
+  if(!correctionCtx)return;
+  const idx=correctionCtx.playerIdx;
+  const p=state.players[idx];
+  const el=document.createElement('div');
+  el.id='corr-overlay';el.className='sheet-overlay';
+  el.innerHTML=`
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-lbl">Corriger le score</div>
+      <div class="sh-player">${avatar(p.name,idx,'lg')}<div class="nm">${esc(p.name)}</div></div>
+      <div style="text-align:center;font-size:20px;color:var(--text-dim);margin-bottom:14px;">
+        Score actuel : <strong style="color:var(--gold-soft);">${p.score}</strong>
+      </div>
+      <label style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--text-muted);display:block;margin-bottom:6px;">Ajustement (négatif pour enlever des points)</label>
+      <input type="number" id="corr-delta" inputmode="numeric" placeholder="ex : +5 ou −10"
+        style="width:100%;background:rgba(15,6,32,.6);border:1px solid var(--line-soft);border-radius:10px;padding:12px 14px;color:var(--text);font-family:var(--serif);font-size:22px;outline:none;display:block;text-align:center;-moz-appearance:textfield;margin-bottom:10px;">
+      <div id="corr-preview" style="text-align:center;font-style:italic;color:var(--text-muted);font-size:14px;min-height:22px;margin-bottom:14px;"></div>
+      <div style="display:flex;gap:10px;">
+        <button id="corr-cancel" class="btn btn-ghost" style="flex:1;">Annuler</button>
+        <button id="corr-ok" class="btn btn-primary" style="flex:2;">Appliquer</button>
+      </div>
+    </div>`;
+  el.querySelector('#corr-delta').addEventListener('input',ev=>{
+    const v=parseInt(ev.target.value,10);
+    const prev=el.querySelector('#corr-preview');
+    if(isNaN(v)){prev.textContent='';return;}
+    const ns=Math.max(0,p.score+v);
+    const sign=v>=0?'+':'';
+    prev.innerHTML=`${sign}${v} → <strong style="color:${ns>=151?'var(--red)':'var(--gold-soft)'};">${ns} pts</strong>${ns>=151?' — éliminé':''}`;
+  });
+  el.querySelector('#corr-cancel').onclick=closeCorrectionOverlay;
+  el.querySelector('#corr-ok').onclick=()=>{
+    const v=parseInt(el.querySelector('#corr-delta').value,10);
+    if(isNaN(v)||v===0){closeCorrectionOverlay();return;}
+    const newScore=Math.max(0,p.score+v);
+    state.players[idx].score=newScore;
+    state.players[idx].eliminated=newScore>=151;
+    state.rounds.push({correction:true,playerIdx:idx,delta:v,dealerIdx:state.dealerIdx});
+    closeCorrectionOverlay();
+    saveState();render();
+    showToast(`Correction ${v>=0?'+':''}${v} pts · ${p.name}`);
+  };
+  el.addEventListener('click',ev=>{if(ev.target===el)closeCorrectionOverlay();});
+  document.body.appendChild(el);
+  setTimeout(()=>{const i=el.querySelector('#corr-delta');i?.focus();},80);
+}
+
+// ---- Rename overlay ----
+let renameCtx=null;
+function openRenameOverlay(playerIdx){
+  renameCtx={playerIdx};
+  renderRenameOverlay();
+}
+function closeRenameOverlay(){
+  renameCtx=null;
+  document.getElementById('rename-overlay')?.remove();
+}
+function renderRenameOverlay(){
+  document.getElementById('rename-overlay')?.remove();
+  if(!renameCtx)return;
+  const idx=renameCtx.playerIdx;
+  const p=state.players[idx];
+  const el=document.createElement('div');
+  el.id='rename-overlay';el.className='sheet-overlay';
+  el.innerHTML=`
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-lbl">Renommer le joueur</div>
+      <div class="sh-player">${avatar(p.name,idx,'lg')}<div class="nm">${esc(p.name)}</div></div>
+      <input type="text" id="rename-input" placeholder="Nouveau nom…" value="${esc(p.name)}" maxlength="20" autocomplete="off"
+        style="width:100%;background:rgba(15,6,32,.6);border:1px solid var(--line-soft);border-radius:10px;padding:12px 14px;color:var(--text);font-family:var(--serif);font-size:20px;outline:none;display:block;margin-bottom:14px;">
+      <div style="display:flex;gap:10px;">
+        <button id="rename-cancel" class="btn btn-ghost" style="flex:1;">Annuler</button>
+        <button id="rename-ok" class="btn btn-primary" style="flex:2;">Confirmer</button>
+      </div>
+    </div>`;
+  el.querySelector('#rename-cancel').onclick=closeRenameOverlay;
+  el.querySelector('#rename-ok').onclick=()=>{
+    const val=el.querySelector('#rename-input').value.trim();
+    if(!val)return;
+    const old=state.players[idx].name;
+    state.players[idx].name=val;
+    if(isHakimName(val)&&!isHakimName(old))playHakimSound();
+    closeRenameOverlay();
+    saveState();render();
+  };
+  el.addEventListener('click',ev=>{if(ev.target===el)closeRenameOverlay();});
+  el.querySelector('#rename-input').addEventListener('keydown',ev=>{if(ev.key==='Enter')el.querySelector('#rename-ok').click();});
+  document.body.appendChild(el);
+  setTimeout(()=>{const i=el.querySelector('#rename-input');i?.focus();i?.select();},80);
+}
+
 // ---- Supabase ----
 async function saveGame(){
   try{
@@ -1034,8 +1152,8 @@ function viewSetup(){
               </div>
             </div>
             ${isOther?`<div class="autre-row" style="padding-left:50px;">
-              <input type="text" placeholder="Nouveau nom…" value="${esc(isOther&&p.name&&!PRESET_NAMES.includes(p.name)?p.name:'')}" data-act="customNameInput" data-i="${i}" maxlength="20" autocomplete="off"/>
-              <button class="btn-save" data-act="addCustomName" data-i="${i}">Enregistrer</button>
+              <input type="text" placeholder="Nouveau nom…" value="${esc(isOther&&p.name&&!PRESET_NAMES.includes(p.name)?p.name:'')}" data-act="customNameInput" data-i="${i}" maxlength="20" autocomplete="off" autocapitalize="words"/>
+              <button type="button" class="btn-save" data-act="addCustomName" data-i="${i}">Enregistrer</button>
             </div>`:''}
           </div>`;
         }).join('')}
@@ -1095,8 +1213,9 @@ function viewScores(){
             <span>${esc(p.name)}</span>
             ${i===dealer&&!p.eliminated?`<span class="badge badge-dealer">Donne</span>`:''}
             ${p.eliminated?`<span class="badge badge-out">Éliminé</span>`:''}
+            <button data-act="openRename" data-i="${i}" style="background:none;border:none;color:var(--text-muted);font-size:14px;padding:2px 5px;cursor:pointer;line-height:1;border-radius:4px;" title="Renommer">✎</button>
           </div>
-          <div class="score-pts ${scoreTone(p.score)}">${p.score}</div>
+          <button data-act="openCorrection" data-i="${i}" class="score-pts ${scoreTone(p.score)}" title="Corriger le score" style="background:none;border:none;cursor:pointer;font:inherit;">${p.score}</button>
         </div>
         <div class="progress"><div class="progress-bar" style="width:${pct}%;background:${barColor(p.score)};"></div></div>
         <div class="score-meta">
@@ -1105,8 +1224,9 @@ function viewScores(){
         </div>
       </div>`;
     }).join('')}
-    <div style="text-align:center;margin-top:8px;">
-      <button class="btn btn-outline" style="font-size:11px;padding:6px 14px;opacity:.55;" data-act="testAudio">🔊 Tester les sons</button>
+    <div style="display:flex;justify-content:center;gap:10px;margin-top:10px;flex-wrap:wrap;">
+      <button class="btn btn-outline" style="font-size:11px;padding:6px 14px;opacity:.55;" data-act="testAudio">🔊 Sons</button>
+      <button class="btn btn-outline" style="font-size:11px;padding:6px 14px;" data-act="shareGame">📲 Partager</button>
     </div>
   `;
 }
@@ -1226,6 +1346,17 @@ function viewHistory(){
   const localRounds=state.rounds.slice().reverse().map((r,ri)=>{
     const num=state.rounds.length-ri;
     const dealerName=state.players[r.dealerIdx]?.name||'—';
+    if(r.correction){
+      const cp=state.players[r.playerIdx];
+      const sign=r.delta>=0?'+':'';
+      return`<div class="round-card" style="border-color:rgba(201,162,39,.25);">
+        <div class="round-head"><div class="round-num" style="color:var(--gold-soft);">✎ Correction</div></div>
+        <div class="round-line">
+          <div class="nm">${avatar(cp.name,r.playerIdx,'sm')}<span>${esc(cp.name)}</span></div>
+          <span class="pt" style="color:${r.delta>=0?'var(--red)':'var(--green)'}">${sign}${r.delta} pts</span>
+        </div>
+      </div>`;
+    }
     if(r.parole)return`<div class="round-card"><div class="round-head"><div class="round-num">Tour ${num} · Parole</div><div class="round-dealer">${esc(dealerName)}</div></div><div class="round-parole">↻ Redistribution ${r.dealerAdvanced?'· donne passée à droite':'· même distributeur'}</div></div>`;
     return`<div class="round-card">
       <div class="round-head"><div class="round-num">Tour ${num}</div><div class="round-dealer">${esc(dealerName)} donne</div></div>
@@ -1242,6 +1373,7 @@ function viewHistory(){
             ${tags.length?`<span class="tags">${tags.join(' · ')}</span>`:''}
           </div>
           <span class="pt" style="color:${e.isWinner?'var(--gold-soft)':e.delta>=51?'var(--red)':'var(--text-dim)'}">+${e.delta}</span>
+          <button data-act="openCorrection" data-i="${e.idx}" style="background:none;border:1px solid var(--line-soft);color:var(--text-muted);font-size:11px;padding:2px 7px;border-radius:6px;cursor:pointer;white-space:nowrap;margin-left:4px;">±</button>
         </div>`;
       }).join('')}
     </div>`;
@@ -1577,13 +1709,8 @@ document.addEventListener('click',ev=>{
     }
     case 'addCustomName':{
       const i=+t.dataset.i;
-      const name=state.players[i].name.trim();
-      if(!name){showToast('Saisis un nom');return}
-      const isNew=persistCustomName(name);
-      playerOtherMode.delete(i);
-      render();
-      if(isHakimName(name))playHakimSound();
-      showToast(isNew?`"${name}" enregistré`:`"${name}" sélectionné`);
+      const field=getCustomNameField(i);
+      commitCustomName(i,field?field.value:state.players[i].name);
       break;
     }
     case 'startGame':{
@@ -1661,6 +1788,15 @@ document.addEventListener('click',ev=>{
     case 'validateRound':handleValidateRound();break;
     case 'clearDraft':state.draft=emptyDraft();render();showToast('Saisie effacée');break;
     case 'testAudio':unlockAudio();playRandomSnippet();showToast('🔊 Test son…');break;
+    case 'openCorrection':openCorrectionOverlay(+t.dataset.i);break;
+    case 'openRename':openRenameOverlay(+t.dataset.i);break;
+    case 'shareGame':{
+      const url=window.location.href.split('?')[0];
+      const text=`Rejoins notre partie de Rami 🃏\n${url}`;
+      if(navigator.share){navigator.share({title:'Partie de Rami',text,url}).catch(()=>{});}
+      else{window.open(`https://wa.me/?text=${encodeURIComponent(text)}`,'_blank');}
+      break;
+    }
     case 'resetConfirm':if(confirm('Terminer la partie et en commencer une nouvelle ?'))resetGame();break;
     case 'newGame':resetGame();break;
   }
@@ -1681,11 +1817,21 @@ document.addEventListener('change',ev=>{
     }
     render();
     if(isHakimName(state.players[i].name))playHakimSound();
+  }else if(t.dataset.act==='customNameInput'){
+    const i=+t.dataset.i;
+    state.players[i].name=t.value;
+    saveState();
   }
 });
 
 document.addEventListener('pointerdown',unlockAudio,{once:true});
 document.addEventListener('keydown',unlockAudio,{once:true});
+document.addEventListener('keydown',ev=>{
+  const t=ev.target.closest('[data-act="customNameInput"]');
+  if(!t||ev.key!=='Enter')return;
+  ev.preventDefault();
+  commitCustomName(+t.dataset.i,t.value);
+});
 
 document.addEventListener('input',ev=>{
   const t=ev.target.closest('[data-act]');

@@ -520,6 +520,15 @@ const RANK_BY_ID=Object.fromEntries(RANKS.map(r=>[r.id,r]));
 const ELIMINATION=151;
 const CARD_MALUS_MAX=51;
 const STORAGE_KEY='rami-v2';
+function generateId(){
+  return Array.from(crypto.getRandomValues(new Uint8Array(7)))
+    .map(b=>'abcdefghijklmnopqrstuvwxyz0123456789'[b%36]).join('');
+}
+function getUrlGameId(){return new URLSearchParams(window.location.search).get('g')||null}
+function setUrlGameId(id){const u=new URL(window.location.href);u.searchParams.set('g',id);window.history.replaceState({},'',u);}
+let gameId=getUrlGameId()||(()=>{const id=generateId();setUrlGameId(id);return id})();
+let syncChannel=null,syncTimer=null,lastCloudJson=null,syncStatus='ok';
+
 const PLAYER_COLORS=['#e84545','#4ade80','#c9a227','#7888a8'];
 const PLAYER_TEXT =['#f4ecd8','#1a0a2e','#1a0a2e','#f4ecd8'];
 
@@ -602,19 +611,77 @@ function cardCalculatorMeta(playerIdx,cardCounts){
     willOut:result.malus!=null&&projected>=ELIMINATION,
   };
 }
-function saveState(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(state))}catch(e){}}
+function normalizeState(s){if(!s.draft)s.draft=emptyDraft();if(s.playForCoffee===undefined)s.playForCoffee=null;if(!s.coffeeDebts)s.coffeeDebts=[];}
+function saveState(){
+  try{localStorage.setItem(STORAGE_KEY,JSON.stringify(state))}catch(e){}
+  saveToCloud();
+}
 function loadState(){
   try{
     const raw=localStorage.getItem(STORAGE_KEY);
     if(!raw)return null;
     const s=JSON.parse(raw);
-    if(!s.draft)s.draft=emptyDraft();
-    if(s.playForCoffee===undefined)s.playForCoffee=null;
-    if(!s.coffeeDebts)s.coffeeDebts=[];
+    normalizeState(s);
     return s;
   }catch(e){return null}
 }
-function resetGame(){localStorage.removeItem(STORAGE_KEY);state=freshSetup();render()}
+function resetGame(){
+  localStorage.removeItem(STORAGE_KEY);
+  state=freshSetup();
+  gameId=generateId();
+  setUrlGameId(gameId);
+  if(syncChannel){db.removeChannel(syncChannel);syncChannel=null;}
+  saveToCloud();
+  subscribeToSession(gameId);
+  render();
+}
+
+// ---- Cloud sync ----
+function updateSyncDot(){
+  const el=document.getElementById('sync-dot');
+  if(!el)return;
+  const cfg={ok:['#4ade80','Synchronisé ✓'],saving:['var(--orange)','Sync…'],error:['var(--red)','Hors ligne']};
+  const[col,lbl]=cfg[syncStatus]||cfg.ok;
+  el.style.background=col;el.title=lbl;
+}
+function saveToCloud(){
+  if(!gameId)return;
+  clearTimeout(syncTimer);
+  syncTimer=setTimeout(async()=>{
+    syncStatus='saving';updateSyncDot();
+    try{
+      const snap=JSON.stringify(state);
+      await db.from('sessions').upsert({id:gameId,state:JSON.parse(snap),updated_at:new Date().toISOString()},{onConflict:'id'});
+      lastCloudJson=snap;syncStatus='ok';
+    }catch(e){syncStatus='error';console.warn('[sync]',e);}
+    updateSyncDot();
+  },800);
+}
+function subscribeToSession(id){
+  if(syncChannel){db.removeChannel(syncChannel);syncChannel=null;}
+  syncChannel=db.channel(`rami:${id}`)
+    .on('postgres_changes',{event:'*',schema:'public',table:'sessions',filter:`id=eq.${id}`},payload=>{
+      const inc=JSON.stringify(payload.new?.state);
+      if(!inc||inc===lastCloudJson)return;
+      const s=payload.new.state;normalizeState(s);
+      state=s;lastCloudJson=inc;
+      try{localStorage.setItem(STORAGE_KEY,JSON.stringify(state))}catch(e){}
+      render();
+    })
+    .subscribe();
+}
+async function initSession(){
+  const urlId=getUrlGameId();
+  if(urlId&&urlId!==gameId){
+    try{
+      const{data,error}=await db.from('sessions').select('state').eq('id',urlId).single();
+      if(!error&&data?.state){normalizeState(data.state);state=data.state;gameId=urlId;try{localStorage.setItem(STORAGE_KEY,JSON.stringify(state))}catch(e){}render();}
+    }catch(e){console.warn('[sync] load failed',e);}
+  }else{
+    saveToCloud();
+  }
+  subscribeToSession(gameId);
+}
 
 function activeIndices(){return state.players.map((p,i)=>({p,i})).filter(o=>!o.p.eliminated).map(o=>o.i)}
 function nextActiveAfter(idx){
@@ -1683,12 +1750,13 @@ function render(){
   }else if(state.screen==='pickCoffee'){
     body=`<header class="header"><div class="brand">Rami</div><div class="brand-sub">Mise en jeu</div></header>${viewPickCoffee()}`;
   }else if(state.screen==='finished'){
-    body=`<header class="header"><div class="brand">Fin de partie</div><div class="brand-sub">${state.rounds.length} tour${state.rounds.length!==1?'s':''} joués</div></header>${viewFinished()}`;
+    body=`<header class="header"><div class="brand">Fin de partie <span id="sync-dot" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#4ade80;vertical-align:middle;margin-left:5px;"></span></div><div class="brand-sub">${state.rounds.length} tour${state.rounds.length!==1?'s':''} joués</div></header>${viewFinished()}`;
   }else{
-    body=`<header class="header"><div class="brand">Rami</div><div class="brand-sub">${state.nbPlayers} joueurs · ${state.rounds.length} tour${state.rounds.length!==1?'s':''}</div></header>${viewGame()}`;
+    body=`<header class="header"><div class="brand">Rami <span id="sync-dot" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#4ade80;vertical-align:middle;margin-left:5px;"></span></div><div class="brand-sub">${state.nbPlayers} joueurs · ${state.rounds.length} tour${state.rounds.length!==1?'s':''}</div></header>${viewGame()}`;
   }
   root.innerHTML=body;
   saveState();
+  updateSyncDot();
   if(state.screen==='game'&&state.tab==='history')loadSavedParties();
 }
 
@@ -1787,7 +1855,7 @@ document.addEventListener('click',ev=>{
     case 'openCorrection':openCorrectionOverlay(+t.dataset.i);break;
     case 'openRename':openRenameOverlay(+t.dataset.i);break;
     case 'shareGame':{
-      const url=window.location.href.split('?')[0];
+      const url=window.location.href;
       const text=`Rejoins notre partie de Rami 🃏\n${url}`;
       if(navigator.share){navigator.share({title:'Partie de Rami',text,url}).catch(()=>{});}
       else{window.open(`https://wa.me/?text=${encodeURIComponent(text)}`,'_blank');}
@@ -1919,6 +1987,7 @@ function handleValidateRound(){
 }
 
 render();
+initSession();
 </script>
 </body>
 </html>

@@ -732,6 +732,23 @@ function jokerCardsHTML(rankId,suitId,small=false){
   return`<div class="${cls}">${cards.join('<span class="joker-sep">ou</span>')}</div>`;
 }
 
+function jokerText(rankId,suitId){
+  const r=RANK_BY_ID[rankId],s=SUIT_BY_ID[suitId];
+  if(!r||!s)return'?';
+  const col=s.color==='red'?'var(--red)':'var(--blue-gray-2)';
+  return`<span style="color:${col};font-weight:700;font-family:var(--display);">${r.label}${s.glyph}</span>`;
+}
+
+function jokerOppositeText(rankId,suitId){
+  const r=RANK_BY_ID[rankId];
+  const suits=jokerCandidateSuits(suitId);
+  if(!r||!suits.length)return'?';
+  return suits.map(s=>{
+    const col=s.color==='red'?'var(--red)':'var(--blue-gray-2)';
+    return`<span style="color:${col};font-weight:700;font-family:var(--display);">${r.label}${s.glyph}</span>`;
+  }).join(`<span style="color:var(--text-muted);font-size:11px;margin:0 3px;">ou</span>`);
+}
+
 function showToast(text,ms=2400){
   document.getElementById('toast')?.remove();
   if(toastTimer)clearTimeout(toastTimer);
@@ -1324,22 +1341,15 @@ function viewEnter(){
       </div>
     </div>
 
-    <div class="panel">
-      <div class="panel-title">Joker du tour</div>
-      <div class="joker-stage">
-        <div>${cardHTML(d.jokerRank,d.jokerSuit)}<div class="joker-label">Carte retournée</div></div>
-        <div class="joker-arrow">➜</div>
-        <div>${jokerCardsHTML(hasJoker?d.jokerRank:null,hasJoker?d.jokerSuit:null,true)}<div class="joker-label is-gold">Jokers possibles</div></div>
+    ${hasJoker?`
+    <div class="panel" style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;">
+      <div style="font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.14em;">Joker du tour</div>
+      <div style="font-size:18px;display:flex;align-items:center;gap:8px;">
+        ${jokerText(d.jokerRank,d.jokerSuit)}
+        <span style="color:var(--gold);font-size:14px;">→</span>
+        ${jokerOppositeText(d.jokerRank,d.jokerSuit)}
       </div>
-      <div style="font-size:13px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.16em;margin-bottom:8px;">Valeur</div>
-      <div class="rank-grid">
-        ${RANKS.map(r=>`<button class="rank-btn ${d.jokerRank===r.id?'active':''}" data-act="pickRank" data-r="${r.id}">${r.label}</button>`).join('')}
-      </div>
-      <div style="font-size:13px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.16em;margin-bottom:8px;">Couleur</div>
-      <div class="suit-row">
-        ${SUITS.map(s=>`<button class="suit-btn ${s.color} ${d.jokerSuit===s.id?'active':''}" data-act="pickSuit" data-s="${s.id}">${s.glyph}</button>`).join('')}
-      </div>
-    </div>
+    </div>`:''}
 
     <div class="panel">
       <div class="switch-row">
@@ -1430,7 +1440,7 @@ function viewHistory(){
     if(r.parole)return`<div class="round-card"><div class="round-head"><div class="round-num">Tour ${num} · Parole</div><div class="round-dealer">${esc(dealerName)}</div></div><div class="round-parole">↻ Redistribution ${r.dealerAdvanced?'· donne passée à droite':'· même distributeur'}</div></div>`;
     return`<div class="round-card">
       <div class="round-head"><div class="round-num">Tour ${num}</div><div class="round-dealer">${esc(dealerName)} donne</div></div>
-      ${r.jokerRank&&r.jokerSuit?`<div class="round-joker"><span class="mini-tag">Jokers :</span>${cardHTML(r.jokerRank,r.jokerSuit,true)}<span class="joker-arrow" style="font-size:16px;">➜</span>${jokerCardsHTML(r.jokerRank,r.jokerSuit,true)}</div>`:''}
+      ${r.jokerRank&&r.jokerSuit?`<div class="round-joker"><span class="mini-tag">Joker :</span><span style="font-size:16px;margin:0 6px;">${jokerText(r.jokerRank,r.jokerSuit)}</span><span class="joker-arrow" style="font-size:14px;">→</span><span style="font-size:16px;margin-left:6px;">${jokerOppositeText(r.jokerRank,r.jokerSuit)}</span></div>`:''}
       ${r.entries.map(e=>{
         const tags=[];
         if(e.p51noFollow)tags.push('+51 sans suivi');
@@ -1615,12 +1625,18 @@ function viewTableau(){
   }).join('');
 
   return`
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
       <div style="font-family:var(--display);font-size:13px;letter-spacing:.18em;text-transform:uppercase;color:var(--gold-soft);">Tour ${state.rounds.length+1}</div>
       <div style="font-size:13px;font-style:italic;color:var(--text-muted);">
         <span class="ic ic-d" style="padding:2px 5px;font-size:10px;">D</span> ${esc(state.players[dealer].name)}
       </div>
     </div>
+    ${d.jokerRank&&d.jokerSuit?`
+    <div style="text-align:center;margin-bottom:8px;display:flex;align-items:center;justify-content:center;gap:10px;font-size:16px;">
+      ${jokerText(d.jokerRank,d.jokerSuit)}
+      <span style="color:var(--gold);font-size:13px;">→</span>
+      ${jokerOppositeText(d.jokerRank,d.jokerSuit)}
+    </div>`:''}
     <div class="tableau-wrap">
       <table class="stbl">
         <thead><tr>${headers}</tr></thead>
@@ -1739,6 +1755,48 @@ function viewPickDealer(){
   </div>`;
 }
 
+function viewPickJoker(){
+  const d=state.draft;
+  const hasJoker=d.jokerRank&&d.jokerSuit;
+  const dealer=state.dealerIdx;
+  return`<div class="content no-tabs fade-in">
+    <div class="setup-hero">
+      <div class="ornament">✦ ❦ ✦</div>
+      <h1>Joker du tour ${state.rounds.length+1}</h1>
+      <p>Retourne la première carte du talon</p>
+    </div>
+    <div class="panel panel-gold" style="margin-bottom:14px;">
+      <div style="display:flex;align-items:center;justify-content:center;gap:12px;">
+        ${avatar(state.players[dealer].name,dealer,'lg')}
+        <div>
+          <div style="font-family:var(--display);font-size:24px;">${esc(state.players[dealer].name)}</div>
+          <div style="font-style:italic;color:var(--text-muted);font-size:12px;letter-spacing:.18em;text-transform:uppercase;">Distributeur</div>
+        </div>
+      </div>
+    </div>
+    <div class="panel">
+      <div style="font-size:13px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.16em;margin-bottom:8px;">Valeur</div>
+      <div class="rank-grid">
+        ${RANKS.map(r=>`<button class="rank-btn ${d.jokerRank===r.id?'active':''}" data-act="pickRank" data-r="${r.id}">${r.label}</button>`).join('')}
+      </div>
+      <div style="font-size:13px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.16em;margin-bottom:8px;margin-top:12px;">Couleur</div>
+      <div class="suit-row">
+        ${SUITS.map(s=>`<button class="suit-btn ${s.color} ${d.jokerSuit===s.id?'active':''}" data-act="pickSuit" data-s="${s.id}">${s.glyph}</button>`).join('')}
+      </div>
+    </div>
+    ${hasJoker?`
+    <div class="panel" style="text-align:center;padding:16px 18px;">
+      <div style="font-size:12px;color:var(--text-muted);letter-spacing:.14em;text-transform:uppercase;margin-bottom:10px;">Carte retournée → Jokers</div>
+      <div style="font-size:26px;display:flex;align-items:center;justify-content:center;gap:12px;">
+        ${jokerText(d.jokerRank,d.jokerSuit)}
+        <span style="color:var(--gold);font-size:18px;">→</span>
+        ${jokerOppositeText(d.jokerRank,d.jokerSuit)}
+      </div>
+    </div>`:''}
+    <button class="btn btn-primary btn-block" data-act="confirmJoker" ${hasJoker?'':'disabled'}>Continuer ›</button>
+  </div>`;
+}
+
 function render(){
   if(state.screen==='game')autoCompleteRound();
   const root=document.getElementById('app');
@@ -1747,6 +1805,8 @@ function render(){
     body=`<header class="header"><div class="brand">Rami</div><div class="brand-sub">Compteur de scores</div></header>${viewSetup()}`;
   }else if(state.screen==='pickDealer'){
     body=`<header class="header"><div class="brand">Rami</div><div class="brand-sub">Choix du distributeur</div></header>${viewPickDealer()}`;
+  }else if(state.screen==='pickJoker'){
+    body=`<header class="header"><div class="brand">Rami</div><div class="brand-sub">Tour ${state.rounds.length+1} — Joker</div></header>${viewPickJoker()}`;
   }else if(state.screen==='pickCoffee'){
     body=`<header class="header"><div class="brand">Rami</div><div class="brand-sub">Mise en jeu</div></header>${viewPickCoffee()}`;
   }else if(state.screen==='finished'){
@@ -1787,9 +1847,19 @@ document.addEventListener('click',ev=>{
     case 'chooseDealer':{
       const i=+t.dataset.i;
       state.dealerIdx=i;
-      state.screen='pickCoffee';
+      state.screen='pickJoker';
       render();
       break;
+    }
+    case 'confirmJoker':{
+      if(!state.draft.jokerRank||!state.draft.jokerSuit){showToast('Sélectionne le joker du tour');return;}
+      if(state.playForCoffee===null){
+        state.screen='pickCoffee';
+      }else{
+        state.screen='game';state.tab='enter';
+        playRandomSnippet();
+      }
+      render();break;
     }
     case 'setCoffee':{
       state.playForCoffee=t.dataset.v==='1';
@@ -1920,7 +1990,9 @@ function handleRedistribute(){
   state.rounds.push({parole:true,dealerIdx:state.dealerIdx,started:wasStarted,dealerAdvanced:wasStarted,jokerRank:state.draft.jokerRank,jokerSuit:state.draft.jokerSuit,entries:[]});
   if(wasStarted)state.dealerIdx=nextActiveAfter(state.dealerIdx);
   const nextDealerName=state.players[state.dealerIdx]?.name||'—';
-  state.draft=emptyDraft();render();
+  state.draft=emptyDraft();
+  state.screen='pickJoker';
+  render();
   playRandomSnippet();
   showToast(wasStarted?`Nouvelle distribution · ${nextDealerName} donne`:`Nouvelle distribution · ${nextDealerName} redonne`);
 }
@@ -1979,7 +2051,7 @@ function handleValidateRound(){
     saveGame();return;
   }
   state.draft=emptyDraft();
-  if(state.tab!=='tableau')state.tab='scores';
+  state.screen='pickJoker';
   render();
   if(!badLayTriggered&&!noFollowTriggered&&!newlyOut.length)playRandomSnippet();
   const toastMsg=newlyOut.length?`${state.players[newlyOut[0].idx].name} éliminé !`:isEtIncomplet?`Étalage incomplet — ${state.players[badLayIdx].name} +51`:winnerIdx!=null?`Tour gagné par ${state.players[winnerIdx].name}`:'Tour validé';

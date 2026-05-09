@@ -338,6 +338,8 @@
   .ic-e{background:rgba(74,222,128,.2);color:var(--green)}
   .ic-51{background:rgba(232,69,69,.22);color:var(--red)}
   .ic-par{background:rgba(120,136,168,.2);color:var(--blue-gray-2)}
+  .ic-d-past{background:rgba(232,69,69,.22);color:var(--red)}
+  .ic-d-next{background:rgba(74,222,128,.22);color:var(--green)}
   .th-pl-score{font-size:15px;font-variant-numeric:tabular-nums;font-weight:700}
 
   /* Bottom sheet */
@@ -1467,6 +1469,7 @@ function viewTableau(){
   const n=state.players.length;
   const active=activeIndices();
   const winnerIdx=active.find(i=>d.perPlayer[i]?.isWinner);
+  const nextDealerIdx=nextActiveAfter(dealer);
 
   const pastRows=state.rounds.map((r,ri)=>{
     if(r.correction)return'';
@@ -1479,7 +1482,7 @@ function viewTableau(){
         return`<td><div class="ci"><span class="ci-out">—</span></div></td>`;
       }
       const chips=[];
-      if(r.dealerIdx===i)chips.push(`<span class="ic ic-d">D</span>`);
+      if(r.dealerIdx===i)chips.push(`<span class="ic ic-d-past">d</span>`);
       if(e.etale)chips.push(`<span class="ic ic-e">E</span>`);
       if(e.p51noFollow)chips.push(`<span class="ic ic-51">51</span>`);
       if(e.p51badLay)chips.push(`<span class="ic ic-51">51!</span>`);
@@ -1516,6 +1519,9 @@ function viewTableau(){
     if(e.malus!==null&&e.malus!==undefined&&!isNaN(e.malus)){
       const willOut=p.score+e.malus>=ELIMINATION;
       return`<td class="ci-tap" data-act="tapCell" data-i="${i}"><div class="ci ${willOut?'ci-pen':''}">${isD?'<span class="ic ic-d">D</span>':''}<span class="ci-total">+${e.malus}</span>${willOut?'<span class="ic ic-51" style="font-size:8px;margin-top:2px;">SORTI</span>':''}${e.etale?'<span class="ic ic-e">E</span>':''}</div></td>`;
+    }
+    if(e.etale){
+      return`<td class="ci-tap" data-act="tapCell" data-i="${i}"><div class="ci ci-win">${isD?'<span class="ic ic-d">D</span>':''}<span class="ci-total">⤵</span><span class="ic ic-e" style="margin-top:2px;">Étalé</span></div></td>`;
     }
     return`<td class="ci-tap" data-act="tapCell" data-i="${i}"><div class="ci">${isD?'<span class="ic ic-d" style="margin-bottom:3px;">D</span>':''}<span style="color:var(--gold-soft);font-size:13px;font-family:var(--display);">Calcul</span></div></td>`;
   }).join('');
@@ -1568,7 +1574,7 @@ function viewTableau(){
               else if(e.malus!==null&&e.malus!==undefined&&!isNaN(e.malus))proj=p.score+e.malus;
               const willOut=proj>=ELIMINATION;
               const col=proj>=100?'var(--red)':proj>=70?'var(--orange)':'var(--green)';
-              return`<td style="color:${col};font-weight:${proj!==p.score?'700':''};">${willOut?`<span style="color:var(--red);">${proj} ⚡</span>`:proj}</td>`;
+              return`<td style="color:${col};font-weight:${proj!==p.score?'700':''};">${willOut?`<span style="color:var(--red);">${proj} ⚡</span>`:proj}${i===nextDealerIdx&&!p.eliminated?`<br><span class="ic ic-d-next" style="margin-top:3px;">d</span>`:''}</td>`;
             }).join('')}
           </tr>
         </tfoot>

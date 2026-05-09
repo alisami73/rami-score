@@ -319,14 +319,12 @@
     letter-spacing:.12em;color:var(--gold-soft);text-align:center;
     border-bottom:2px solid var(--gold-deep);position:sticky;top:0;z-index:2;
   }
-  .stbl th.th-round{width:30px;font-size:9px;color:var(--text-muted);padding:8px 2px}
-  .stbl td{padding:5px 3px;text-align:center;border-bottom:1px solid var(--line-soft);vertical-align:middle;min-width:66px}
-  .stbl td.td-round{font-size:10px;color:var(--text-muted);border-right:1px solid var(--line-soft);padding:4px 5px;width:28px}
+  .stbl td{padding:6px 4px;text-align:center;border-bottom:1px solid var(--line-soft);vertical-align:middle;min-width:76px}
   .stbl .row-current td{background:rgba(201,162,39,.05)}
-  .stbl .row-total td{background:var(--surface);border-top:2px solid var(--gold-deep);font-size:16px;font-weight:700;padding:8px 4px}
-  .ci{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:34px;gap:1px;border-radius:6px}
-  .ci-total{font-size:14px;font-variant-numeric:tabular-nums;font-weight:600}
-  .ci-delta{font-size:10px;color:var(--text-muted);font-weight:400}
+  .stbl .row-total td{background:var(--surface);border-top:2px solid var(--gold-deep);font-size:18px;font-weight:700;padding:10px 4px}
+  .ci{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:44px;gap:2px;border-radius:6px}
+  .ci-total{font-size:20px;font-variant-numeric:tabular-nums;font-weight:700}
+  .ci-delta{font-size:11px;color:var(--text-muted);font-weight:400}
   .ci-win .ci-total{color:var(--gold-soft)}
   .ci-win .ci-delta{color:var(--gold-deep)}
   .ci-pen .ci-total{color:var(--red)}
@@ -340,7 +338,7 @@
   .ic-e{background:rgba(74,222,128,.2);color:var(--green)}
   .ic-51{background:rgba(232,69,69,.22);color:var(--red)}
   .ic-par{background:rgba(120,136,168,.2);color:var(--blue-gray-2)}
-  .th-pl-score{font-size:13px;font-variant-numeric:tabular-nums}
+  .th-pl-score{font-size:15px;font-variant-numeric:tabular-nums;font-weight:700}
 
   /* Bottom sheet */
   .sheet-overlay{
@@ -1467,10 +1465,8 @@ function viewTableau(){
   const active=activeIndices();
   const winnerIdx=active.find(i=>d.perPlayer[i]?.isWinner);
 
-  // Compute running totals from rounds history
-  const runTotals=new Array(n).fill(0);
-
   const pastRows=state.rounds.map((r,ri)=>{
+    if(r.correction)return'';
     const rowHtml=state.players.map((p,i)=>{
       if(r.parole){
         return`<td><div class="ci"><span class="ic ic-par">↻</span></div></td>`;
@@ -1479,7 +1475,6 @@ function viewTableau(){
       if(!e){
         return`<td><div class="ci"><span class="ci-out">—</span></div></td>`;
       }
-      runTotals[i]+=e.delta;
       const chips=[];
       if(r.dealerIdx===i)chips.push(`<span class="ic ic-d">D</span>`);
       if(e.etale)chips.push(`<span class="ic ic-e">E</span>`);
@@ -1492,15 +1487,13 @@ function viewTableau(){
         </div></td>`;
       }
       const hasPen=e.p51noFollow||e.p51badLay;
+      const sign=e.delta>0?'+':'';
       return`<td><div class="ci ${hasPen?'ci-pen':''}">
-        <span class="ci-total">${runTotals[i]}</span>
-        <span class="ci-delta">+${e.delta}</span>
+        <span class="ci-total">${sign}${e.delta}</span>
         ${chips.length?`<div class="ichips">${chips.join('')}</div>`:''}
       </div></td>`;
     }).join('');
-    const roundLabel=r.parole?`${ri+1}<span class="ic ic-par" style="display:inline-block;margin-left:2px;">↻</span>`:String(ri+1);
-    const isDealerRow=r.dealerIdx===dealer;
-    return`<tr><td class="td-round">${roundLabel}</td>${rowHtml}</tr>`;
+    return`<tr>${rowHtml}</tr>`;
   });
 
   // Current round cells
@@ -1514,16 +1507,14 @@ function viewTableau(){
     const hasPen=e.p51noFollow||e.p51badLay;
     const penPts=(e.p51noFollow?51:0)+(e.p51badLay?51:0);
     if(hasPen){
-      const proj=p.score+penPts;
-      const willOut=proj>=ELIMINATION;
-      return`<td class="ci-tap" data-act="tapCell" data-i="${i}"><div class="ci ci-pen">${isD?'<span class="ic ic-d">D</span>':''}<span class="ci-total">${proj}</span><span class="ci-delta">+${penPts}</span>${willOut?'<span class="ic ic-51" style="font-size:8px;margin-top:1px;">SORTI</span>':''}${e.etale?'<span class="ic ic-e">E</span>':''}</div></td>`;
+      const willOut=p.score+penPts>=ELIMINATION;
+      return`<td class="ci-tap" data-act="tapCell" data-i="${i}"><div class="ci ci-pen">${isD?'<span class="ic ic-d">D</span>':''}<span class="ci-total">+${penPts}</span>${willOut?'<span class="ic ic-51" style="font-size:8px;margin-top:2px;">SORTI</span>':''}${e.etale?'<span class="ic ic-e">E</span>':''}</div></td>`;
     }
     if(e.malus!==null&&e.malus!==undefined&&!isNaN(e.malus)){
-      const proj=p.score+e.malus;
-      const willOut=proj>=ELIMINATION;
-      return`<td class="ci-tap" data-act="tapCell" data-i="${i}"><div class="ci ${willOut?'ci-pen':''}">${isD?'<span class="ic ic-d">D</span>':''}<span class="ci-total">${proj}</span><span class="ci-delta">+${e.malus}</span>${willOut?'<span class="ic ic-51" style="font-size:8px;margin-top:1px;">SORTI</span>':''}${e.etale?'<span class="ic ic-e">E</span>':''}</div></td>`;
+      const willOut=p.score+e.malus>=ELIMINATION;
+      return`<td class="ci-tap" data-act="tapCell" data-i="${i}"><div class="ci ${willOut?'ci-pen':''}">${isD?'<span class="ic ic-d">D</span>':''}<span class="ci-total">+${e.malus}</span>${willOut?'<span class="ic ic-51" style="font-size:8px;margin-top:2px;">SORTI</span>':''}${e.etale?'<span class="ic ic-e">E</span>':''}</div></td>`;
     }
-    return`<td class="ci-tap" data-act="tapCell" data-i="${i}"><div class="ci">${isD?'<span class="ic ic-d" style="margin-bottom:2px;">D</span>':''}<span class="ci-total" style="color:var(--gold-soft);font-size:11px;">Calcul</span><span class="ci-delta">toucher</span></div></td>`;
+    return`<td class="ci-tap" data-act="tapCell" data-i="${i}"><div class="ci">${isD?'<span class="ic ic-d" style="margin-bottom:3px;">D</span>':''}<span style="color:var(--gold-soft);font-size:13px;font-family:var(--display);">Calcul</span></div></td>`;
   }).join('');
 
   // Validate button check
@@ -1542,7 +1533,7 @@ function viewTableau(){
     const col=s>=100?'var(--red)':s>=70?'var(--orange)':'var(--green)';
     return`<th>
       ${avatar(p.name,i,'sm')}
-      <div style="font-size:9px;margin-top:3px;color:var(--text-dim);max-width:64px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(p.name)}</div>
+      <div style="font-size:11px;margin-top:3px;color:var(--text-dim);max-width:72px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(p.name)}</div>
       <div class="th-pl-score" style="color:${col};">${s}</div>
     </th>`;
   }).join('');
@@ -1556,17 +1547,15 @@ function viewTableau(){
     </div>
     <div class="tableau-wrap">
       <table class="stbl">
-        <thead><tr><th class="th-round">#</th>${headers}</tr></thead>
+        <thead><tr>${headers}</tr></thead>
         <tbody>
           ${pastRows.join('')}
           <tr class="row-current">
-            <td class="td-round" style="color:var(--gold);">→</td>
             ${currentCells}
           </tr>
         </tbody>
         <tfoot>
           <tr class="row-total">
-            <td class="td-round" style="font-size:9px;color:var(--text-muted);">TOT</td>
             ${state.players.map((p,i)=>{
               if(p.eliminated)return`<td><span style="color:var(--red);font-size:11px;">Sorti</span></td>`;
               const e=d.perPlayer[i]||{};

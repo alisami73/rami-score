@@ -881,7 +881,7 @@ function closeSheet(){
 function applySheet(){
   if(sheetPlayerIdx===null)return;
   const idx=sheetPlayerIdx;
-  if(sheetData.isWinner)activeIndices().forEach(j=>{if(state.draft.perPlayer[j])state.draft.perPlayer[j].isWinner=false});
+  if(sheetData.isWinner)activeIndices().forEach(j=>{if(state.draft.perPlayer[j]){state.draft.perPlayer[j].isWinner=false;if(j!==idx)state.draft.perPlayer[j].etale=false;}});
   state.draft.perPlayer[idx]={isWinner:sheetData.isWinner,malus:sheetData.malus,cardCounts:hasCardCounts(sheetData.cardCounts)?normalizeCardCounts(sheetData.cardCounts):null,p51noFollow:sheetData.p51noFollow,p51badLay:sheetData.p51badLay,etale:sheetData.etale,parole:false};
   state.draft.started=true;
   closeSheet();render();
@@ -1034,7 +1034,11 @@ function renderSheet(){
   el.querySelector('#sh-win').onclick=()=>{sheetData.isWinner=!sheetData.isWinner;if(sheetData.isWinner){sheetData.p51noFollow=false;sheetData.p51badLay=false;sheetData.malus=null;sheetData.cardCounts=emptyCardCounts()}renderSheet()};
   const shNf=el.querySelector('#sh-nf');if(shNf)shNf.onclick=()=>{if(!nfDisabled){sheetData.p51noFollow=!sheetData.p51noFollow;if(sheetData.p51noFollow)sheetData.p51badLay=false;sheetData.isWinner=false;renderSheet()}};
   const shBl=el.querySelector('#sh-bl');if(shBl)shBl.onclick=()=>{if(!badLayDisabled){sheetData.p51badLay=!sheetData.p51badLay;if(sheetData.p51badLay)sheetData.p51noFollow=false;sheetData.isWinner=false;renderSheet()}};
-  el.querySelector('#sh-et').onclick=()=>{sheetData.etale=!sheetData.etale;renderSheet()};
+  el.querySelector('#sh-et').onclick=()=>{
+    sheetData.etale=!sheetData.etale;
+    if(sheetData.etale){sheetData.isWinner=true;sheetData.p51noFollow=false;sheetData.p51badLay=false;sheetData.malus=null;sheetData.cardCounts=emptyCardCounts();}
+    renderSheet();
+  };
   el.querySelector('#sh-malus')?.addEventListener('input',ev=>{
     const v=parseInt(ev.target.value,10);
     sheetData.malus=isNaN(v)?null:Math.max(0,v);
@@ -1883,7 +1887,7 @@ document.addEventListener('click',ev=>{
       const i=+t.dataset.i;
       if(state.draft.perPlayer[i]?.parole)return;
       const cur=state.draft.perPlayer[i]?.isWinner;
-      activeIndices().forEach(j=>{if(state.draft.perPlayer[j])state.draft.perPlayer[j].isWinner=false});
+      activeIndices().forEach(j=>{if(state.draft.perPlayer[j]){state.draft.perPlayer[j].isWinner=false;if(j!==i)state.draft.perPlayer[j].etale=false;}});
       if(!cur){
         state.draft.perPlayer[i]=state.draft.perPlayer[i]||{};
         state.draft.perPlayer[i].isWinner=true;

@@ -1323,13 +1323,16 @@ function viewEnter(){
           <div style="font-style:italic;color:var(--text-muted);font-size:14px;">
             ${d.started?`Tour commencé — la donne passe à droite à ${esc(redistributionDealerName)}.`:`Tour non commencé — ${esc(redistributionDealerName)} redistribue.`}
           </div>
-          <button class="btn btn-primary btn-block mt-16" data-act="redistribute">↻ Nouvelle distribution de ${esc(redistributionDealerName)}</button>
+          <button class="btn btn-ghost btn-block mt-16" data-act="redistribute">↻ Redistribuer — ${d.started?`donne à ${esc(redistributionDealerName)}`:'même distributeur'}</button>
         </div>`
-      :`<div class="row-flex">
-          <button class="btn btn-ghost" data-act="clearDraft">Effacer</button>
-          <button class="btn btn-primary" data-act="validateRound" ${winnerIdx==null&&!isEtIncompletDraft?'disabled':''}>
-            ${isEtIncompletDraft?'Valider — Étalage incomplet ›':winnerIdx==null?'Choisir un gagnant':'Valider le tour ›'}
-          </button>
+      :`<div style="display:flex;flex-direction:column;gap:10px;">
+          <div class="row-flex">
+            <button class="btn btn-ghost" data-act="clearDraft">Effacer</button>
+            <button class="btn btn-primary" data-act="validateRound" ${winnerIdx==null&&!isEtIncompletDraft?'disabled':''}>
+              ${isEtIncompletDraft?'Valider — Étalage incomplet ›':winnerIdx==null?'Choisir le gagnant ›':'Nouvelle distribution ›'}
+            </button>
+          </div>
+          <button class="btn btn-ghost btn-block" data-act="redistribute" style="font-size:13px;">↻ Redistribuer — sans score</button>
         </div>`
     }`;
 }
@@ -1576,11 +1579,9 @@ function viewTableau(){
       <span><span class="ic ic-e">E</span> Étalé</span>
       <span><span class="ic ic-51">51</span> Pénalité</span>
     </div>
-    ${canValidate
-      ?`<button class="btn btn-primary btn-block" data-act="validateRound">Valider le tour ${state.rounds.length+1} ›</button>`
-      :`<div style="text-align:center;font-style:italic;color:var(--text-muted);font-size:13px;">Clique sur une cellule <span style="color:var(--gold);">Calcul</span> pour ouvrir la saisie</div>`
-    }
-    <button class="btn btn-ghost btn-block" data-act="redistribute" data-started="1" style="margin-top:10px;">↻ Nouvelle distribution</button>`;
+    <button class="btn btn-primary btn-block" data-act="validateRound" ${canValidate?'':'disabled'}>Nouvelle distribution ›</button>
+    ${!canValidate?`<div style="text-align:center;font-style:italic;color:var(--text-muted);font-size:12px;margin-top:6px;">Touche une cellule <span style="color:var(--gold);">Calcul</span> pour saisir</div>`:''}
+    <button class="btn btn-ghost btn-block" data-act="redistribute" data-started="1" style="margin-top:8px;font-size:13px;">↻ Redistribuer — sans score</button>`;
 }
 
 function undoLastRound(){
